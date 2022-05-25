@@ -13,14 +13,14 @@ from os.path import isfile, join
 import re
 
 import time
-# env = gym.make("highway-continuous-v0")
-env = gym.make("intersection-v0")
+# env = gym.make("exit-continuous-4lane-v0")
+env = gym.make("intersection-v1")
 # env = gym.make("exit-continuous-4lane-v0")
 #env = gym.make("racetrack-v0")
 
 env.configure({
     "manual_control": True,
-    "real_time_rendering": False,
+    "real_time_rendering": True,
     #"random_vehicles_density": True,
     # "vehicles_density" : 1.5,#1.6,
     # "duration": 24,
@@ -66,7 +66,7 @@ while True:
         observation,reward,done,info = env.step([0.0,0.0])  # with manual control, these actions are ignored
         et = time.time()
         total_time += et-st
-        manual_action = info['continuous_manual_action']
+        # manual_action = info['continuous_manual_action']
         # actions_list.append(list(manual_action))
         # states_list.append(list(observation))
         #observation,reward,done,info = env.step(action)  # with manual control, these actions are ignored
