@@ -21,3 +21,6 @@ _build
 
 # Outputs
 **/out/*
+
+**/.vimspector.json
+
