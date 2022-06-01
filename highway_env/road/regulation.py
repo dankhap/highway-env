@@ -9,9 +9,9 @@ from highway_env.vehicle.kinematics import Vehicle, Obstacle
 
 
 class RegulatedRoad(Road):
-    YIELDING_COLOR: Tuple[float, float, float] = None
-    REGULATION_FREQUENCY: int = 2
-    YIELD_DURATION: float = 0.
+    YIELDING_COLOR: Tuple[float, float, float] = (0.0,0.0,1.0)
+    REGULATION_FREQUENCY: int = 15
+    YIELD_DURATION: float = 1.
 
     def __init__(self, network: RoadNetwork = None, vehicles: List[Vehicle] = None, obstacles: List[Obstacle] = None,
                  np_random: np.random.RandomState = None, record_history: bool = False) -> None:
@@ -80,4 +80,6 @@ class RegulatedRoad(Road):
             # Accurate rectangular check
             if utils.rotated_rectangles_intersect((position_1, 1.5*v1.LENGTH, 0.9*v1.WIDTH, heading_1),
                                                   (position_2, 1.5*v2.LENGTH, 0.9*v2.WIDTH, heading_2)):
+            # if utils.rotated_rectangles_intersect((position_1, 100*v1.LENGTH, 100*v1.WIDTH, heading_1),
+            #                                       (position_2, 100*v2.LENGTH, 100*v2.WIDTH, heading_2)):
                 return True
