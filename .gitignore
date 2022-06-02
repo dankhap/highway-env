@@ -2,6 +2,7 @@
 *.pyc
 build/
 dist/
+videos/
 
 # Setup
 **.egg*

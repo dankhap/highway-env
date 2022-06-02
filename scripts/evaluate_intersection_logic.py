@@ -24,8 +24,8 @@ env.configure({
     "real_time_rendering": False,
     "spawn_probability": 1.0,
     #"random_vehicles_density": True,
-    "vehicles_density" : 5,#1.6,
-    "duration": 24,
+    "vehicles_density" : 1.6, #5,#1.6,
+    "duration": 13,
     "vehicles_count" : 15,
 
     "exclude_src_lane": 0,
@@ -34,6 +34,13 @@ env.configure({
     "regulation_freq": 15,
     "yield_duration": 1,
     # "yield_duration_range": [0, 3]
+
+    # Original defaults
+    # "exclude_src_lane": None,
+    # "COMFORT_ACC_MAX": 6.0,
+    # "COMFORT_ACC_MIN": -3.0,
+    # "regulation_freq": 2,
+    # "yield_duration": 0,
 
     # "disable_collision_checks": True,
     
@@ -98,7 +105,6 @@ while ep_count < 50:
     env.reset()
     done = False
 
-print(f"current params {RegulatedRoad.YIELD_DURATION}, {RegulatedRoad.REGULATION_FREQUENCY} ")
 print(f"total crashes: {total_crushes}")
 print(f"average vehicle speed: {np.mean(avg_speeds)}")
 print(f"average time for episode {np.mean(times)}")

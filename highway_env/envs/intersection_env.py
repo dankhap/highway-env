@@ -26,7 +26,7 @@ class IntersectionEnv(AbstractEnv):
         config = super().default_config()
         config.update({
             "observation": {
-                "type": "Kinematics",
+                "type": "KinematicObservation",
                 "vehicles_count": 15,
                 "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
                 "features_range": {
@@ -60,11 +60,17 @@ class IntersectionEnv(AbstractEnv):
             "reward_speed_range": [7.0, 9.0],
             "normalize_reward": False,
             "offroad_terminal": False,
+            "anycrash_terminal": False,
             "exclude_src_lane": None,
-            "COMFORT_ACC_MAX": 6,
-            "COMFORT_ACC_MIN": -3,
-            "regulation_freq": 2,
-            "yield_duration": 0,
+            # Original configuration
+            # "COMFORT_ACC_MAX": 6.0,
+            # "COMFORT_ACC_MIN": -3.0,
+            # "regulation_freq": 2,
+            # "yield_duration": 0,
+            "COMFORT_ACC_MAX": 12,
+            "COMFORT_ACC_MIN": -12,
+            "regulation_freq": 15,
+            "yield_duration": 1,
             "yield_duration_range": None
         })
         return config
@@ -89,7 +95,8 @@ class IntersectionEnv(AbstractEnv):
         return any(vehicle.crashed for vehicle in self.controlled_vehicles) \
                or all(self.has_arrived(vehicle) for vehicle in self.controlled_vehicles) \
                or self.steps >= self.config["duration"] * self.config["policy_frequency"] \
-               or (self.config["offroad_terminal"] and not self.vehicle.on_road)
+               or (self.config["offroad_terminal"] and not self.vehicle.on_road) \
+               or (self.config["anycrash_terminal"] and any([v.crashed for v in self.road.vehicles]))
 
     def _agent_is_terminal(self, vehicle: Vehicle) -> bool:
         """The episode is over when a collision occurs or when the access ramp has been passed."""
@@ -311,12 +318,41 @@ class ContinuousIntersectionEnv(IntersectionEnv):
         })
         return config
 
+class MLPIntersectionEnv(IntersectionEnv):
+
+    @classmethod
+    def default_config(cls) -> dict:
+        config = super().default_config()
+        config.update({
+            "observation": {
+                "type": "KinematicFlattenObservation",
+                "vehicles_count": 15,
+                "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
+                "features_range": {
+                    "x": [-100, 100],
+                    "y": [-100, 100],
+                    "vx": [-20, 20],
+                    "vy": [-20, 20],
+                },
+                "absolute": True,
+                "flatten": False,
+                "observe_intentions": False
+            },
+        })
+        return config
+
 TupleMultiAgentIntersectionEnv = MultiAgentWrapper(MultiAgentIntersectionEnv)
 
 
 register(
     id='intersection-v0',
     entry_point='highway_env.envs:IntersectionEnv',
+)
+
+
+register(
+    id='intersection-flatten-v0',
+    entry_point='highway_env.envs:MLPIntersectionEnv',
 )
 
 register(
