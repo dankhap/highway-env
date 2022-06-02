@@ -59,7 +59,13 @@ class IntersectionEnv(AbstractEnv):
             "arrived_reward": 1,
             "reward_speed_range": [7.0, 9.0],
             "normalize_reward": False,
-            "offroad_terminal": False
+            "offroad_terminal": False,
+            "exclude_src_lane": None,
+            "COMFORT_ACC_MAX": 6,
+            "COMFORT_ACC_MIN": -3,
+            "regulation_freq": 2,
+            "yield_duration": 0,
+            "yield_duration_range": None
         })
         return config
 
@@ -95,6 +101,9 @@ class IntersectionEnv(AbstractEnv):
         info = super()._info(obs, action)
         info["agents_rewards"] = tuple(self._agent_reward(action, vehicle) for vehicle in self.controlled_vehicles)
         info["agents_dones"] = tuple(self._agent_is_terminal(vehicle) for vehicle in self.controlled_vehicles)
+        info["other_crushed_count"] = np.sum([v.crashed for v in self.road.vehicles])
+        info["other_crushed"] = any([v.crashed for v in self.road.vehicles])
+        info["other_avg_speed"] = np.mean([v.speed for v in self.road.vehicles])
         return info
 
     def _reset(self) -> None:
@@ -161,7 +170,10 @@ class IntersectionEnv(AbstractEnv):
             net.add_lane("il" + str((corner - 1) % 4), "o" + str((corner - 1) % 4),
                          StraightLane(end, start, line_types=[n, c], priority=priority, speed_limit=10))
 
-        road = RegulatedRoad(network=net, np_random=self.np_random, record_history=self.config["show_trajectories"])
+        road = RegulatedRoad(network=net, np_random=self.np_random, record_history=self.config["show_trajectories"],
+                regulation_freq=self.config["regulation_freq"],
+                yield_duration=self.config["yield_duration"],
+                yield_duration_range=self.config["yield_duration_range"])
         self.road = road
 
     def _make_vehicles(self, n_vehicles: int = 10) -> None:
@@ -173,8 +185,8 @@ class IntersectionEnv(AbstractEnv):
         # Configure vehicles
         vehicle_type = utils.class_from_path(self.config["other_vehicles_type"])
         vehicle_type.DISTANCE_WANTED = 7  # Low jam distance
-        vehicle_type.COMFORT_ACC_MAX = 6
-        vehicle_type.COMFORT_ACC_MIN = -3
+        vehicle_type.COMFORT_ACC_MAX = self.config["COMFORT_ACC_MAX"]
+        vehicle_type.COMFORT_ACC_MIN = self.config["COMFORT_ACC_MIN"]
 
         # Random vehicles
         simulation_steps = 3
@@ -218,7 +230,14 @@ class IntersectionEnv(AbstractEnv):
         if self.np_random.rand() > spawn_probability:
             return
 
-        route = self.np_random.choice(range(4), size=2, replace=False)
+        exclude = self.config["exclude_src_lane"]
+        if not exclude is None:
+            route = [exclude,0]
+            while route[0] == exclude:
+                route = self.np_random.choice(range(4), size=2, replace=False)
+        else:
+            route = self.np_random.choice(range(4), size=2, replace=False)
+
         route[1] = (route[0] + 2) % 4 if go_straight else route[1]
         vehicle_type = utils.class_from_path(self.config["other_vehicles_type"])
         vehicle = vehicle_type.make_on_lane(self.road, ("o" + str(route[0]), "ir" + str(route[0]), 0),
