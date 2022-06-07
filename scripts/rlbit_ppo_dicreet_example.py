@@ -1,16 +1,13 @@
 
-import math
 import tempfile
 import numpy as np
-import gym
-
+import warnings
 from rlbit.common.logger import configure
 from rlbit.envs.env_builder import load_envs_syncvectorenv
-from rlbit.trainers.ppo_clean_rl.ppo_trainer import PPOTrainer
 from rlbit.trainers.settings import ExperimentSettings
-from rlbit.trainers.trainer import Trainer
 from rlbit.common.torch import set_torch_config
 from rlbit.trainers.trainer_controller import TrainerController
+import highway_env
 
 def check_environment_trains(env, config):
 
@@ -37,10 +34,14 @@ def check_environment_trains(env, config):
 
 
 if __name__ == '__main__':
-    with open("scripts/highway_rlbit_config.yaml") as f:
+    with open("highway_rlbit_config.yaml") as f:
         content = f.read()
         config = ExperimentSettings.parse_raw(content)
     env = load_envs_syncvectorenv(config=config)
+
+    warnings.filterwarnings("ignore", category=DeprecationWarning) 
+    warnings.simplefilter(action='ignore', category=FutureWarning)
+
     set_torch_config(config.torch)
     check_environment_trains(env, config)
     
