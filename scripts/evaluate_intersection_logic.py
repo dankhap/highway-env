@@ -17,15 +17,15 @@ from os.path import isfile, join
 import re
 
 import time
-env = gym.make("intersection-v0")
+env = gym.make("intersection-flatten-v0")
 
 env.configure({
     # "manual_control": True,
     "real_time_rendering": False,
     "spawn_probability": 1.0,
     #"random_vehicles_density": True,
-    "vehicles_density" : 1.6, #5,#1.6,
-    "duration": 13,
+    "vehicles_density" : 5, #5,#1.6,
+    "duration": 24,
     "vehicles_count" : 15,
 
     "exclude_src_lane": 0,

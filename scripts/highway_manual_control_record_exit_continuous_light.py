@@ -14,23 +14,19 @@ import re
 
 import time
 # env = gym.make("exit-continuous-4lane-v0")
-env = gym.make("intersection-v1")
+env = gym.make("intersection-v0")
 # env = gym.make("exit-continuous-4lane-v0")
 #env = gym.make("racetrack-v0")
 
 env.configure({
     "manual_control": True,
     "real_time_rendering": True,
+    "spawn_probability": 1.0,
     #"random_vehicles_density": True,
-    # "vehicles_density" : 1.5,#1.6,
-    # "duration": 24,
-    # "vehicles_count" : 15,
+    "vehicles_density" : 5,#1.6,
+    "duration": 24,
+    "vehicles_count" : 15,
     # "disable_collision_checks": True,
-    "steering_range": [-np.pi, np.pi],
-    #"observation": {
-    #            "type": "KinematicFlattenObservation",
-    #            "normalize": False,
-    #        },
     
 })
 
@@ -94,7 +90,7 @@ while True:
     sum_reward = 0
     
     #env.seed(episode_number)
-    env.seed(0)
+    # env.seed(0)
     env.reset()
     done = False
 

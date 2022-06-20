@@ -690,6 +690,8 @@ class LidarFlattenObservation(LidarObservation):
 def observation_factory(env: 'AbstractEnv', config: dict) -> ObservationType:
     if config["type"] == "TimeToCollision":
         return TimeToCollisionObservation(env, **config)
+    elif config["type"] == "KinematicObservation":
+        return KinematicObservation(env, **config)
     elif config["type"] == "Kinematics":
         return KinematicObservation(env, **config)
     elif config["type"] == "OccupancyGrid":
