@@ -31,6 +31,7 @@ class RoadObject(ABC):
         """
         self.road = road
         self.position = np.array(position, dtype=np.float64)
+
         self.heading = heading
         self.speed = speed
         self.lane_index = self.road.network.get_closest_lane_index(self.position, self.heading) if self.road else np.nan

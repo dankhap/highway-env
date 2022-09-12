@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -9,14 +9,22 @@ from highway_env.vehicle.kinematics import Vehicle, Obstacle
 
 
 class RegulatedRoad(Road):
-    YIELDING_COLOR: Tuple[float, float, float] = None
-    REGULATION_FREQUENCY: int = 2
-    YIELD_DURATION: float = 0.
+    YIELDING_COLOR: Tuple[float, float, float] = (0.0,0.0,1.0)
+    # REGULATION_FREQUENCY: int = 2
+    # YIELD_DURATION: float = 0.
+    # YIELD_DURATION_RANGE: Optional[List] = None
 
-    def __init__(self, network: RoadNetwork = None, vehicles: List[Vehicle] = None, obstacles: List[Obstacle] = None,
-                 np_random: np.random.RandomState = None, record_history: bool = False) -> None:
+    def __init__(self, network: Optional[RoadNetwork]= None, vehicles: List[Vehicle] = None, obstacles: List[Obstacle] = None,
+                 np_random: np.random.RandomState = None, record_history: bool = False,
+                 regulation_freq: int = 2,
+                 yield_duration: float = 0,
+                 yield_duration_range: Optional[List] = None) -> None:
         super().__init__(network, vehicles, obstacles, np_random, record_history)
         self.steps = 0
+        self.REGULATION_FREQUENCY = regulation_freq
+        self.YIELD_DURATION = yield_duration
+        self.YIELD_DURATION_RANGE = yield_duration_range
+
 
     def step(self, dt: float) -> None:
         self.steps += 1
@@ -24,13 +32,22 @@ class RegulatedRoad(Road):
             self.enforce_road_rules()
         return super().step(dt)
 
+    def _get_duration(self):
+
+        if self.YIELD_DURATION_RANGE is None:
+            yield_duration = self.YIELD_DURATION
+        else:
+            yield_duration = self.np_random.choice(range(*self.YIELD_DURATION_RANGE)) 
+        return yield_duration
+
     def enforce_road_rules(self) -> None:
         """Find conflicts and resolve them by assigning yielding vehicles and stopping them."""
 
         # Unfreeze previous yielding vehicles
         for v in self.vehicles:
             if getattr(v, "is_yielding", False):
-                if v.yield_timer >= self.YIELD_DURATION * self.REGULATION_FREQUENCY:
+                yield_duration = self._get_duration()
+                if v.yield_timer >= yield_duration * self.REGULATION_FREQUENCY:
                     v.target_speed = v.lane.speed_limit
                     delattr(v, "color")
                     v.is_yielding = False
@@ -80,4 +97,6 @@ class RegulatedRoad(Road):
             # Accurate rectangular check
             if utils.rotated_rectangles_intersect((position_1, 1.5*v1.LENGTH, 0.9*v1.WIDTH, heading_1),
                                                   (position_2, 1.5*v2.LENGTH, 0.9*v2.WIDTH, heading_2)):
+            # if utils.rotated_rectangles_intersect((position_1, 100*v1.LENGTH, 100*v1.WIDTH, heading_1),
+            #                                       (position_2, 100*v2.LENGTH, 100*v2.WIDTH, heading_2)):
                 return True

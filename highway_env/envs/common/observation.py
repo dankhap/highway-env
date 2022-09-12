@@ -543,6 +543,49 @@ class ExitObservation(KinematicObservation):
         # Flatten
         return obs
 
+class KinematicFlattenObservation(KinematicObservation):
+
+    """Observe the kinematics of nearby vehicles."""
+
+    def observe(self) -> np.ndarray:
+        obs = super(KinematicFlattenObservation, self).observe()
+        # Flatten
+        #print("hey")
+        obs = obs.reshape(-1)
+        #obs[1] = 0.0
+        return obs
+
+    def space(self) -> spaces.Space:
+        # the , after features is used to denote a tuple
+        return spaces.Box(shape=(self.vehicles_count * len(self.features),), low=-np.inf, high=np.inf, dtype=np.float32)
+
+class ExitContinuousObservation(ExitObservation):
+
+    """Observe the kinematics of nearby vehicles."""
+
+    def observe(self) -> np.ndarray:
+        obs = super(ExitContinuousObservation, self).observe()
+        # Flatten
+        #print("hey")
+        return obs.reshape(-1)
+
+    def space(self) -> spaces.Space:
+        # the , after features is used to denote a tuple
+        return spaces.Box(shape=(self.vehicles_count * len(self.features),), low=-np.inf, high=np.inf, dtype=np.float32)
+
+class ExitContinuousCNNObservation(ExitObservation):
+
+    """Observe the kinematics of nearby vehicles."""
+
+    def observe(self) -> np.ndarray:
+        obs = super(ExitObservation, self).observe()
+        # Flatten
+        # print("hey")
+        return obs.reshape(1, *obs.shape)
+
+    def space(self) -> spaces.Space:
+        return spaces.Box(shape=(1, self.vehicles_count, len(self.features)), low=-np.inf, high=np.inf, dtype=np.float32)
+
 
 class LidarObservation(ObservationType):
     DISTANCE = 0
@@ -621,10 +664,35 @@ class LidarObservation(ObservationType):
     def index_to_direction(self, index: int) -> np.ndarray:
         return np.array([np.cos(index * self.angle), np.sin(index * self.angle)])
 
+class LidarFlattenObservation(LidarObservation):
+
+    """Observe the kinematics of nearby vehicles."""
+
+    def observe(self) -> np.ndarray:
+        obs = super(LidarFlattenObservation, self).observe()
+        obs = obs.reshape(-1)
+
+        ego_dict = self.observer_vehicle.to_dict()
+        #print(ego_dict)
+        exit_lane = self.env.road.network.get_lane(("1", "2", -1))
+        x=exit_lane.local_coordinates(self.observer_vehicle.position)[0]
+        y=exit_lane.local_coordinates(self.observer_vehicle.position)[1]
+        obs = np.concatenate((obs, np.array((x,y,ego_dict['vx'],ego_dict['vy'],ego_dict['heading']))), axis=0)
+        #print(obs[-2:])
+
+        # Flatten
+        # print("hey")
+        return obs
+
+    def space(self) -> spaces.Space:
+        high = 1 if self.normalize else self.maximum_range
+        return spaces.Box(shape=(self.cells*2+5,), low=-high, high=high, dtype=np.float32)
 
 def observation_factory(env: 'AbstractEnv', config: dict) -> ObservationType:
     if config["type"] == "TimeToCollision":
         return TimeToCollisionObservation(env, **config)
+    elif config["type"] == "KinematicObservation":
+        return KinematicObservation(env, **config)
     elif config["type"] == "Kinematics":
         return KinematicObservation(env, **config)
     elif config["type"] == "OccupancyGrid":
@@ -643,5 +711,14 @@ def observation_factory(env: 'AbstractEnv', config: dict) -> ObservationType:
         return LidarObservation(env, **config)
     elif config["type"] == "ExitObservation":
         return ExitObservation(env, **config)
+    elif config["type"] == "ExitContinuousObservation":
+        return ExitContinuousObservation(env, **config)
+    elif config["type"] == "ExitContinuousCNNObservation":
+        return ExitContinuousCNNObservation(env, **config)
+    elif config["type"] == "KinematicFlattenObservation":
+        return KinematicFlattenObservation(env, **config)
+    elif config["type"] == "LidarFlattenObservation":
+        return LidarFlattenObservation(env, **config)
+
     else:
         raise ValueError("Unknown observation type")

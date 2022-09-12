@@ -2,6 +2,7 @@
 *.pyc
 build/
 dist/
+videos/
 
 # Setup
 **.egg*
@@ -21,3 +22,6 @@ _build
 
 # Outputs
 **/out/*
+
+**/.vimspector.json
+
