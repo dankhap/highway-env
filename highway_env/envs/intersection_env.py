@@ -111,11 +111,10 @@ class IntersectionEnv(AbstractEnv):
     def _is_terminated(self) -> bool:
         return any(vehicle.crashed for vehicle in self.controlled_vehicles) \
                or all(self.has_arrived(vehicle) for vehicle in self.controlled_vehicles) \
+               or (self.config["offroad_terminal"] and not self.vehicle.on_road)
 # improving behaivoir
            #   or self.steps >= self.config["duration"] * self.config["policy_frequency"] \
            #   or (self.config["anycrash_terminal"] and any([v.crashed for v in self.road.vehicles])) \
-
-               or (self.config["offroad_terminal"] and not self.vehicle.on_road)
 
 
     def _agent_is_terminal(self, vehicle: Vehicle) -> bool:

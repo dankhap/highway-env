@@ -212,6 +212,43 @@ class RoadNetwork(object):
         return [lane for to in self.graph.values() for ids in to.values() for lane in ids]
 
     @staticmethod
+    def opposit_lanes_network(lanes: int = 4,
+                              start: float = 0,
+                              length: float = 10000,
+                              direction: Optional[List[bool]] = None,
+                              angle: float = 0,
+                              speed_limit: float = 30,
+                              nodes_str: Optional[Tuple[str, str]] = None,
+                              net: Optional['RoadNetwork'] = None) \
+            -> 'RoadNetwork':
+        net = net or RoadNetwork()
+        fwd_nodes_str = nodes_str or ("0", "1")
+        bck_nodes_str = nodes_str or ("2", "3")
+        if not direction:
+            direction = [True]*lanes
+        for lane in range(lanes):
+            origin = np.array([start, lane * StraightLane.DEFAULT_WIDTH])
+            end = np.array([start + length, lane * StraightLane.DEFAULT_WIDTH])
+            nodes_str = fwd_nodes_str
+            # na,nb = nodes_str
+
+            if not direction[lane]:
+                origin, end = end, origin
+                # na,nb = nb, na
+                nodes_str = bck_nodes_str
+                
+
+            rotation = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
+            origin = rotation @ origin
+            end = rotation @ end
+            line_types = [LineType.CONTINUOUS_LINE if lane == 0 else LineType.STRIPED,
+                          LineType.CONTINUOUS_LINE if lane == lanes - 1 or direction[lane + 1] != direction[lane] else LineType.NONE]
+            # net.add_lane(na,nb, StraightLane(origin, end, line_types=line_types, speed_limit=speed_limit))
+            net.add_lane(*nodes_str, StraightLane(origin, end, line_types=line_types, speed_limit=speed_limit))
+        return net
+
+
+    @staticmethod
     def straight_road_network(lanes: int = 4,
                               start: float = 0,
                               length: float = 10000,
