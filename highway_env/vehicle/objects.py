@@ -19,8 +19,8 @@ class RoadObject(ABC):
     For now we assume all objects are rectangular.
     """
 
-    LENGTH: float = 2  # Object length [m]
-    WIDTH: float = 2  # Object width [m]
+    # LENGTH: float = 2  # Object length [m]
+    # WIDTH: float = 2  # Object width [m]
 
     def __init__(self, road: 'Road', position: Sequence[float], heading: float = 0, speed: float = 0):
         """
@@ -32,6 +32,8 @@ class RoadObject(ABC):
         self.road = road
         self.position = np.array(position, dtype=np.float64)
 
+        self.LENGTH: float = 2  # Object length [m]
+        self.WIDTH: float = 2  # Object width [m]
         self.heading = heading
         self.speed = speed
         self.lane_index = self.road.network.get_closest_lane_index(self.position, self.heading) if self.road else np.nan
@@ -183,9 +185,11 @@ class Obstacle(RoadObject):
 
     """Obstacles on the road."""
 
-    def __init__(self, road, position: Sequence[float], heading: float = 0, speed: float = 0):
+    def __init__(self, road, position: Sequence[float], heading: float = 0, speed: float = 0, width: float = 2, length: float = 2):
         super().__init__(road, position, heading, speed)
         self.solid = True
+        self.WIDTH = width
+        self.LENGTH = length
 
     @classmethod
     def create_random(cls, road,

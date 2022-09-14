@@ -230,11 +230,9 @@ class RoadNetwork(object):
             origin = np.array([start, lane * StraightLane.DEFAULT_WIDTH])
             end = np.array([start + length, lane * StraightLane.DEFAULT_WIDTH])
             nodes_str = fwd_nodes_str
-            # na,nb = nodes_str
 
             if not direction[lane]:
                 origin, end = end, origin
-                # na,nb = nb, na
                 nodes_str = bck_nodes_str
                 
 

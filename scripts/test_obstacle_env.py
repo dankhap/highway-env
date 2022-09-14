@@ -8,6 +8,9 @@ import highway_env
 # ==================================
 def main():
     env = gym.make("obstacle-v0")
+    env.configure({
+    "manual_control": True
+    })
     obs = env.reset()
     for t in range(10000):
         obs, rew, done, info = env.step(np.array([0,0]))
