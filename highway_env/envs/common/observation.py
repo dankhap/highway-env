@@ -199,12 +199,8 @@ class KinematicObservation(ObservationType):
                     df[feature] = np.clip(df[feature], -1, 1)
         return df
 
-    def observe(self) -> np.ndarray:
-        if not self.env.road:
-            return np.zeros(self.space().shape)
-
-        # Add ego-vehicle
-        df = pd.DataFrame.from_records([self.observer_vehicle.to_dict()])[self.features]
+    def add_close_vehicles(self):
+        df = None
         # Add nearby traffic
         close_vehicles = self.env.road.close_vehicles_to(self.observer_vehicle,
                                                          self.env.PERCEPTION_DISTANCE,
@@ -213,10 +209,25 @@ class KinematicObservation(ObservationType):
                                                          sort=self.order == "sorted")
         if close_vehicles:
             origin = self.observer_vehicle if not self.absolute else None
-            df = pd.concat([df, pd.DataFrame.from_records(
+            df = pd.DataFrame.from_records(
                 [v.to_dict(origin, observe_intentions=self.observe_intentions)
-                 for v in close_vehicles[-self.vehicles_count + 1:]])[self.features]],
-                           ignore_index=True)
+                 for v in close_vehicles[-self.vehicles_count + 1:]])[self.features]
+        return df
+
+    def add_ego_vehicle(self):
+        ego_rows = pd.DataFrame.from_records([self.observer_vehicle.to_dict()])[self.features]
+        return ego_rows
+
+    def add_objects(self) -> pd.DataFrame:
+        ego_rows = self.add_ego_vehicle()
+        close_vehicles = self.add_close_vehicles()
+        return pd.concat([ego_rows, close_vehicles], ignore_index=True)
+
+    def observe(self) -> np.ndarray:
+        if not self.env.road:
+            return np.zeros(self.space().shape)
+
+        df = self.add_objects()
         # Normalize and clip
         if self.normalize:
             df = self.normalize_obs(df)
@@ -503,45 +514,36 @@ class TupleObservation(ObservationType):
         return tuple(obs_type.observe() for obs_type in self.observation_types)
 
 
+
+class ObstacleObservation(KinematicObservation):
+
+    """Specific to exit_env, observe the distance to the next exit lane as part of a KinematicObservation."""
+    
+    def add_ego_vehicle(self):
+        # relative coordinates to 4 points of the obstacle and goal point
+        ego_dict = self.observer_vehicle.to_dict() 
+        obstacle = self.env.road.objects[-1]
+        corners = obstacle.polygon()[1:]
+        relative_coreners = corners - np.array([ego_dict["x"], ego_dict["y"]])
+        records = [{"presence": 1, "x": c[0], "y": c[1], "vx": 0, "vy": 0} for c in relative_coreners]
+
+        exit_lane = self.env.road.network.get_lane(("0", "1", -1))
+        ego_dict["x"] = exit_lane.local_coordinates(self.observer_vehicle.position)[0]
+        records.append(ego_dict)
+
+        df = pd.DataFrame.from_records(records)[self.features]
+        return df
+
 class ExitObservation(KinematicObservation):
 
     """Specific to exit_env, observe the distance to the next exit lane as part of a KinematicObservation."""
 
-    def observe(self) -> np.ndarray:
-        if not self.env.road:
-            return np.zeros(self.space().shape)
-
-        # Add ego-vehicle
+    def add_ego_vehicle(self):
         ego_dict = self.observer_vehicle.to_dict()
         exit_lane = self.env.road.network.get_lane(("1", "2", -1))
         ego_dict["x"] = exit_lane.local_coordinates(self.observer_vehicle.position)[0]
         df = pd.DataFrame.from_records([ego_dict])[self.features]
-
-        # Add nearby traffic
-        close_vehicles = self.env.road.close_vehicles_to(self.observer_vehicle,
-                                                         self.env.PERCEPTION_DISTANCE,
-                                                         count=self.vehicles_count - 1,
-                                                         see_behind=self.see_behind)
-        if close_vehicles:
-            origin = self.observer_vehicle if not self.absolute else None
-            df = pd.concat([df, pd.DataFrame.from_records(
-                [v.to_dict(origin, observe_intentions=self.observe_intentions)
-                 for v in close_vehicles[-self.vehicles_count + 1:]])[self.features]],
-                           ignore_index=True)
-        # Normalize and clip
-        if self.normalize:
-            df = self.normalize_obs(df)
-        # Fill missing rows
-        if df.shape[0] < self.vehicles_count:
-            rows = np.zeros((self.vehicles_count - df.shape[0], len(self.features)))
-            df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)
-        # Reorder
-        df = df[self.features]
-        obs = df.values.copy()
-        if self.order == "shuffled":
-            self.env.np_random.shuffle(obs[1:])
-        # Flatten
-        return obs
+        return df
 
 class KinematicFlattenObservation(KinematicObservation):
 
@@ -719,6 +721,8 @@ def observation_factory(env: 'AbstractEnv', config: dict) -> ObservationType:
         return KinematicFlattenObservation(env, **config)
     elif config["type"] == "LidarFlattenObservation":
         return LidarFlattenObservation(env, **config)
+    elif config["type"] == "ObstacleObservation":
+        return ObstacleObservation(env, **config)
 
     else:
         raise ValueError("Unknown observation type")

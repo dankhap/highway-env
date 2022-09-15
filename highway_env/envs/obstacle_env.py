@@ -32,7 +32,7 @@ class ObstacleEnv(AbstractEnv):
         config = super().default_config()
         config.update({
             "observation": {
-                "type": "KinematicObservation",
+                "type": "ObstacleObservation",
                 # "vehicles_count": 5,
                 # "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
                 # "absolute" : False,
