@@ -18,17 +18,17 @@ class BicycleVehicle(Vehicle):
     LENGTH_A: float = Vehicle.LENGTH / 2  # [m]
     LENGTH_B: float = Vehicle.LENGTH / 2  # [m]
     INERTIA_Z: float = 1/12 * MASS * (Vehicle.LENGTH ** 2 + Vehicle.WIDTH ** 2)  # [kg.m2]
-    FRICTION_FRONT: float = 15.0 * MASS  # [N]
-    FRICTION_REAR: float = 15.0 * MASS  # [N]
 
     MAX_ANGULAR_SPEED: float = 2 * np.pi  # [rad/s]
     MAX_SPEED: float = 15  # [m/s]
 
-    def __init__(self, road: Road, position: Vector, heading: float = 0, speed: float = 0) -> None:
+    def __init__(self, road: Road, position: Vector, heading: float = 0, speed: float = 0, friction_coeff: float = 15) -> None:
         super().__init__(road, position, heading, speed)
         self.lateral_speed = 0
         self.yaw_rate = 0
         self.theta = None
+        self.FRICTION_FRONT: float = friction_coeff * BicycleVehicle.MASS  # [N]
+        self.FRICTION_REAR: float = friction_coeff * BicycleVehicle.MASS  # [N]
         self.A_lat, self.B_lat = self.lateral_lpv_dynamics()
 
     @property
