@@ -90,6 +90,9 @@ class WorldSurface(pygame.Surface):
         :param event: a pygame event
         """
         if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_q:
+                pygame.display.quit()
+                pygame.quit()
             if event.key == pygame.K_l:
                 self.scaling *= 1 / self.SCALING_FACTOR
             if event.key == pygame.K_o:

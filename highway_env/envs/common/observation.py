@@ -151,6 +151,7 @@ class KinematicObservation(ObservationType):
                  clip: bool = True,
                  see_behind: bool = False,
                  observe_intentions: bool = False,
+                 additional_obs: int = 0,
                  **kwargs: dict) -> None:
         """
         :param env: The environment to observe
@@ -173,6 +174,7 @@ class KinematicObservation(ObservationType):
         self.clip = clip
         self.see_behind = see_behind
         self.observe_intentions = observe_intentions
+        self.additional_obs = additional_obs
 
     def space(self) -> spaces.Space:
         return spaces.Box(shape=(self.vehicles_count, len(self.features)), low=-np.inf, high=np.inf, dtype=np.float32)
@@ -219,8 +221,8 @@ class KinematicObservation(ObservationType):
         return ego_rows
 
     def add_objects(self) -> pd.DataFrame:
-        ego_rows = self.add_ego_vehicle()
         close_vehicles = self.add_close_vehicles()
+        ego_rows = self.add_ego_vehicle()
         return pd.concat([ego_rows, close_vehicles], ignore_index=True)
 
     def observe(self) -> np.ndarray:
@@ -232,8 +234,9 @@ class KinematicObservation(ObservationType):
         if self.normalize:
             df = self.normalize_obs(df)
         # Fill missing rows
-        if df.shape[0] < self.vehicles_count:
-            rows = np.zeros((self.vehicles_count - df.shape[0], len(self.features)))
+        total_expected_items = self.vehicles_count + self.additional_obs
+        if df.shape[0] < total_expected_items:
+            rows = np.zeros((total_expected_items - df.shape[0], len(self.features)))
             df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)
         # Reorder
         df = df[self.features]
@@ -515,25 +518,6 @@ class TupleObservation(ObservationType):
 
 
 
-class ObstacleObservation(KinematicObservation):
-
-    """Specific to exit_env, observe the distance to the next exit lane as part of a KinematicObservation."""
-    
-    def add_ego_vehicle(self):
-        # relative coordinates to 4 points of the obstacle and goal point
-        ego_dict = self.observer_vehicle.to_dict() 
-        obstacle = self.env.road.objects[-1]
-        corners = obstacle.polygon()[1:]
-        relative_coreners = corners - np.array([ego_dict["x"], ego_dict["y"]])
-        records = [{"presence": 1, "x": c[0], "y": c[1], "vx": 0, "vy": 0} for c in relative_coreners]
-
-        exit_lane = self.env.road.network.get_lane(("0", "1", -1))
-        ego_dict["x"] = exit_lane.local_coordinates(self.observer_vehicle.position)[0]
-        records.append(ego_dict)
-
-        df = pd.DataFrame.from_records(records)[self.features]
-        return df
-
 class ExitObservation(KinematicObservation):
 
     """Specific to exit_env, observe the distance to the next exit lane as part of a KinematicObservation."""
@@ -551,8 +535,6 @@ class KinematicFlattenObservation(KinematicObservation):
 
     def observe(self) -> np.ndarray:
         obs = super(KinematicFlattenObservation, self).observe()
-        # Flatten
-        #print("hey")
         obs = obs.reshape(-1)
         #obs[1] = 0.0
         return obs
@@ -560,6 +542,41 @@ class KinematicFlattenObservation(KinematicObservation):
     def space(self) -> spaces.Space:
         # the , after features is used to denote a tuple
         return spaces.Box(shape=(self.vehicles_count * len(self.features),), low=-np.inf, high=np.inf, dtype=np.float32)
+
+class ObstacleObservation(KinematicFlattenObservation):
+
+    # def __init__(self, env: 'AbstractEnv',
+    #              features: List[str] = None,
+    #              vehicles_count: int = 5,
+    #              features_range: Dict[str, List[float]] = None,
+    #              absolute: bool = False,
+    #              order: str = "sorted",
+    #              normalize: bool = True,
+    #              clip: bool = True,
+    #              see_behind: bool = False,
+    #              observe_intentions: bool = False,
+    #              **kwargs: dict) -> None:
+
+    """Specific to exit_env, observe the distance to the next exit lane as part of a KinematicObservation."""
+    
+
+    def add_ego_vehicle(self):
+        # relative coordinates to 4 points of the obstacle and goal point
+        ego_dict = self.observer_vehicle.to_dict() 
+        obstacle = self.env.road.objects[-1]
+        corners = obstacle.polygon()[1:]
+        relative_coreners = corners - np.array([ego_dict["x"], ego_dict["y"]])
+        records = [{"presence": 1, "x": c[0], "y": c[1], "vx": 0, "vy": 0} for c in relative_coreners]
+
+        exit_lane = self.env.road.network.get_lane(("0", "1", -1))
+        ego_dict["x"] = exit_lane.local_coordinates(self.observer_vehicle.position)[0]
+        records.append(ego_dict)
+
+        df = pd.DataFrame.from_records(records)[self.features]
+        return df
+
+    def space(self) -> spaces.Space:
+        return spaces.Box(shape=((self.vehicles_count + self.additional_obs) * len(self.features),), low=-np.inf, high=np.inf, dtype=np.float32)
 
 class ExitContinuousObservation(ExitObservation):
 

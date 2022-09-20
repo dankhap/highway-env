@@ -33,6 +33,7 @@ class ObstacleEnv(AbstractEnv):
         config.update({
             "observation": {
                 "type": "ObstacleObservation",
+                "additional_obs": 4
                 # "vehicles_count": 5,
                 # "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
                 # "absolute" : False,
@@ -51,15 +52,18 @@ class ObstacleEnv(AbstractEnv):
             "duration": 40,  # [s]
             "ego_spacing": 2,
             "vehicles_density": 0.5,
+            "on_target_reward": 100,   #reward when reaching the original lane after the obstacle
+            "time_pass_reward": -0.1,    # each step adds a negative cost to the reward
+            "offroad_reward":   -0.1,    # each step adds a negative cost to the reward
             "collision_reward": -1,    # The reward received when colliding with a vehicle.
                                        # zero for other lanes.
-            "high_speed_reward": 0.4,  # The reward received when driving at full speed, linearly mapped to zero for
+            "high_speed_reward": 0.0,  # The reward received when driving at full speed, linearly mapped to zero for
                                        # lower speeds according to config["reward_speed_range"].
             "lane_change_reward": 0,   # The reward received at each lane change action.
             "spawn_probability": 0.5,
             "reward_speed_range": [20, 30],
             "normalize_reward": True,
-            "offroad_terminal": False,
+            "offroad_terminal": True,
             "real_time_rendering": False,
             "obst_width_range": [2,4],
             "obst_length_range": [4,6],
@@ -141,10 +145,18 @@ class ObstacleEnv(AbstractEnv):
         v = BicycleVehicle(self.road,  lane.position(x0, 0), lane.heading_at(x0), speed, friction_coeff=friction)
         return v
     
+    def _set_target(self, vehicle):
+        obst_end = self.road.objects[-1].polygon()[1:].T[0].max()
+        target_x = obst_end + Vehicle.LENGTH*2 
+        target_y = vehicle.position[1]
+        self.target = np.array([target_x, target_y])
+        self.target_orient = vehicle.heading
+        dist = np.linalg.norm(self.target - vehicle.position)
+        self.initial_target_dist = dist 
+        self.previuos_dist = dist
 
     def _create_vehicles(self) -> None:
         """Create some new random vehicles of a given type, and add them on the road."""
-        other_vehicles_type = utils.class_from_path(self.config["other_vehicles_type"])
         other_per_controlled = near_split(self.config["vehicles_count"], num_bins=self.config["controlled_vehicles"])
         rnd_width = self.np_random.uniform(*self.config["obst_width_range"])
         rnd_length = self.np_random.uniform(*self.config["obst_length_range"])
@@ -166,12 +178,20 @@ class ObstacleEnv(AbstractEnv):
                                             side_dist=rnd_side,
                                             heading=rnd_heading)
             self.road.objects.append(obst)
-
+            self._set_target(vehicle)
             for _ in range(others):
                 vehicle = self.create_random_reverse(lane_idx=("2", "3", 0),  
                                                      spacing=1 / self.config["vehicles_density"])
                 # vehicle.randomize_behavior()
                 self.road.vehicles.append(vehicle)
+    
+    def _passed_obstacle(self):
+        vehicle = self.controlled_vehicles[-1]
+        passed_obst = vehicle.position[0] > self.target[0]
+        on_lane = abs(vehicle.lane.local_coordinates(vehicle.position)[1]) < 0.1
+        oriented = abs(vehicle.heading - self.target_orient) < 0.1
+        return passed_obst and on_lane and oriented
+
 
     def _reward(self, action: Action) -> float:
         """
@@ -186,21 +206,23 @@ class ObstacleEnv(AbstractEnv):
                                 [self.config["collision_reward"],
                                  self.config["high_speed_reward"]],
                                 [0, 1])
-        reward *= rewards['on_road_reward']
         return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
-        neighbours = self.road.network.all_side_lanes(self.vehicle.lane_index)
-        lane = self.vehicle.target_lane_index[2] if isinstance(self.vehicle, ControlledVehicle) \
-            else self.vehicle.lane_index[2]
-        # Use forward speed rather than speed, see https://github.com/eleurent/highway-env/issues/268
-        forward_speed = self.vehicle.speed * np.cos(self.vehicle.heading)
-        scaled_speed = utils.lmap(forward_speed, self.config["reward_speed_range"], [0, 1])
+        adv_to_target = 0
+        if self.vehicle.position[0] < self.target[0]: # vehicle didnt pass obstacle
+            current_dist = self.target[0] - self.vehicle.position[0]
+            adv_to_target = self.previuos_dist - current_dist
+            if self.config["normalize_reward"]:
+                adv_to_target /= self.initial_target_dist
+            self.previuos_dist = current_dist
+
         return {
             "collision_reward": float(self.vehicle.crashed),
-            "right_lane_reward": lane / max(len(neighbours) - 1, 1),
-            "high_speed_reward": np.clip(scaled_speed, 0, 1),
-            "on_road_reward": float(self.vehicle.on_road)
+            "adv_to_target_reward": adv_to_target,
+            "time_cost": -1.0,
+            "on_target_reward": float(self._passed_obstacle()),
+            "offroad_reward": float(not self.vehicle.on_road)
         }
 
     def _spawn_vehicle(self,
