@@ -53,13 +53,14 @@ class ObstacleEnv(AbstractEnv):
             "ego_spacing": 2,
             "vehicles_density": 0.5,
             "on_target_reward": 100,   #reward when reaching the original lane after the obstacle
-            "time_pass_reward": -0.1,    # each step adds a negative cost to the reward
-            "offroad_reward":   -0.1,    # each step adds a negative cost to the reward
-            "collision_reward": -1,    # The reward received when colliding with a vehicle.
+            "time_pass_reward": 0.1,    # each step adds a negative cost to the reward
+            "offroad_reward":   1,    # each step adds a negative cost to the reward
+            "collision_reward": 1,    # The reward received when colliding with a vehicle.
                                        # zero for other lanes.
             "high_speed_reward": 0.0,  # The reward received when driving at full speed, linearly mapped to zero for
                                        # lower speeds according to config["reward_speed_range"].
             "lane_change_reward": 0,   # The reward received at each lane change action.
+            "adv_to_target_reward": 1,
             "spawn_probability": 0.5,
             "reward_speed_range": [20, 30],
             "normalize_reward": True,
@@ -201,29 +202,25 @@ class ObstacleEnv(AbstractEnv):
         """
         rewards = self._rewards(action)
         reward = sum(self.config.get(name, 0) * reward for name, reward in rewards.items())
-        if self.config["normalize_reward"]:
-            reward = utils.lmap(reward,
-                                [self.config["collision_reward"],
-                                 self.config["high_speed_reward"]],
-                                [0, 1])
         return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
-        adv_to_target = 0
+        adv_to_target = 0.0
+
         if self.vehicle.position[0] < self.target[0]: # vehicle didnt pass obstacle
-            current_dist = self.target[0] - self.vehicle.position[0]
+            current_dist = np.linalg.norm(self.target - self.vehicle.position)
             adv_to_target = self.previuos_dist - current_dist
             if self.config["normalize_reward"]:
                 adv_to_target /= self.initial_target_dist
             self.previuos_dist = current_dist
 
         return {
-            "collision_reward": float(self.vehicle.crashed),
+            "collision_reward": -float(self.vehicle.crashed),
             "adv_to_target_reward": adv_to_target,
-            "time_cost": -1.0,
+            "time_pass_reward": -1.0,
             "on_target_reward": float(self._passed_obstacle()),
             "offroad_reward": float(not self.vehicle.on_road)
-        }
+            } # type: ignore
 
     def _spawn_vehicle(self,
                        longitudinal: float = 0,
@@ -264,15 +261,28 @@ class ObstacleEnv(AbstractEnv):
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, _, info = super().step(action)
+        if self.render_mode == 'rgb_array':
+            self.render()
         # self._clear_vehicles()
         # self._spawn_vehicle(spawn_probability=self.config["spawn_probability"])
         # return obs, reward, terminated, truncated, info
         return obs, reward, terminated, info
 
+    def _on_any_lane(self) -> bool:
+        lane_idx = self.road.network.get_closest_lane_index(self.vehicle.position)
+        return self.road.network.get_lane(lane_idx).on_lane(self.vehicle.position)
+
     def _is_terminated(self) -> bool:
         """The episode is over if the ego vehicle crashed."""
-        return self.vehicle.crashed or \
-            (self.config["offroad_terminal"] and not self.vehicle.on_road)
+        offroad = self.config["offroad_terminal"] and not self._on_any_lane()
+        failed = self.vehicle.crashed or offroad
+        success = self._passed_obstacle()
+
+        if success:
+            print("#################")
+            print("PASSED OBSTACLE !!!!")
+            print("#################")
+        return bool(failed or success)
 
     def _is_truncated(self) -> bool:
         """The episode is over if the ego vehicle crashed or the time is out."""

@@ -1,0 +1,174 @@
+import datetime
+import click
+from clearml import Task
+import functools
+import numpy as np
+import gym
+import highway_env
+from highway_env.utils import lmap
+import pygame
+import seaborn as sns
+
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+from stable_baselines3 import SAC
+import ast
+
+class PythonLiteralOption(click.Option):
+
+    def type_cast_value(self, ctx, value):
+        try:
+            return ast.literal_eval(value)
+        except:
+            raise click.BadParameter(value)
+# ==================================
+#        Main script
+# ==================================
+def display_vehicles_attention(agent_surface,
+        sim_surface,
+        env,
+        min_attention=0.01):
+    intencity = 0.0
+    attention_surface = pygame.Surface(sim_surface.get_size(), pygame.SRCALPHA)
+    corners = env.road.objects[-1].polygon()[1:]
+    for corner in corners:
+        desat = np.clip(lmap(intencity, (0, 0.5), (0.7, 1)), 0.7, 1)
+        colors = sns.color_palette("dark", desat=desat)
+        color = np.array(colors[(2) % (len(colors) - 1)]) * 255
+        color = (*color, np.clip(lmap(intencity, (0, 0.5), (100, 200)), 100, 200))
+        pygame.draw.line(attention_surface, color,
+                         sim_surface.vec2pix(env.vehicle.position),
+                         sim_surface.vec2pix(corner),
+                         1)
+    sim_surface.blit(attention_surface, (0, 0))
+
+
+def get_task_name(prefix):
+    dt = datetime.datetime.now()
+    suffix = dt.strftime("%d%m%y_%H%M%S")
+    return f"{prefix}_{suffix}"
+
+@click.group()
+@click.option('--algo', default="sac")
+@click.option('--clearml', is_flag=True)
+def cli(algo, clearml):
+    task_name = get_task_name(algo)
+    # task_name = "bicycle/sac_240822_143535:"
+
+    print(f"starting task andromeda_obstacle/{task_name}:")
+    if clearml:
+        Task.init(project_name="andromeda_obstacle", task_name=task_name)
+    # pass
+
+@cli.command("sac_run")
+@click.option("--gymid", default="obstacle-v0", help="gym env id")
+@click.option("--lr", default=3e-4, help="Learning rate")
+@click.option("--ncpu", default=1, help="Number of cpu's")
+@click.option("--bs", default=4096, help="The person to greet.")
+@click.option("--warmap", default=10000, help="warmup steps")
+@click.option("--hidden", default=254, help="warmup steps")
+@click.option("--skipframe", default=0, help="how much frames to skip")
+@click.option("--ent_coef", default="auto", help="warmup steps")
+@click.option("--tsteps", default=4e6, help="total learninig steps")
+@click.option("--write_every", default=2e5, help="write model params every x steps")
+@click.option("--use_sde", default=False, help="use sde exploration")
+@click.option("--sde_sample_freq", default=-1, help="rate of resampling the exploration")
+@click.option("--dt", default=0.02, help="rate of simulation")
+@click.option("--norm_rew", is_flag=True, help="normalize reward")
+@click.option("--epi_stps", default=2048, help="max steps per episode")
+
+@click.option("--lrange", cls=PythonLiteralOption, default=[4,6],
+        help="obstacle length range")
+@click.option("--wrange", cls=PythonLiteralOption, default=[2,4],
+        help="obstacle width range")
+@click.option("--orange", cls=PythonLiteralOption, default=[-np.pi*0.25, np.pi*0.25],
+        help="obstacle orientation range")
+@click.option("--srange", cls=PythonLiteralOption, default=[0,3],
+        help="obstacle lateral distance range")
+@click.option("--frange", cls=PythonLiteralOption, default=[10, 20],
+        help="vehicle friction range")
+def sac_run(gymid,
+            lr,
+            ncpu,
+            bs,
+            warmap,
+            hidden,
+            skipframe,
+            ent_coef,
+            tsteps,
+            write_every,
+            use_sde,
+            sde_sample_freq,
+            dt,
+            norm_rew,
+            epi_stps,
+            lrange, wrange, orange, srange, frange):
+
+    exp_name = "obstacle_sac"
+    env = gym.make(gymid, render_mode='rgb_array')
+
+    env = gym.make("obstacle-v0", render_mode='rgb_array')
+    env.configure({
+        "obst_width_range": wrange,
+        "obst_length_range": lrange,
+        "obst_heading_range": orange,
+        # "obst_ego_dist_range": wrange,
+        "obst_side_range": srange,
+        "obst_friction_range": frange, #15
+        "normalize_reward": norm_rew,
+    })
+    obs = env.reset()
+
+    env.render()
+    env.viewer.set_agent_display(functools.partial(display_vehicles_attention, env=env ))
+    model = SAC("MlpPolicy",
+                env,
+                batch_size=bs,
+                learning_starts=warmap,
+                learning_rate=lr,
+                ent_coef=ent_coef, 
+                use_sde=use_sde,
+                sde_sample_freq=sde_sample_freq,
+                verbose=2,
+                tensorboard_log=f"{exp_name}/")
+
+    model.learn(total_timesteps=tsteps, log_interval=4)
+    model.save(f"{exp_name}/model")
+
+def main():
+    env = gym.make("obstacle-v0", render_mode='rgb_array')
+    # env.configure({
+    # "manual_control": True
+    # })
+    obs = env.reset()
+
+    env.render()
+    env.viewer.set_agent_display(functools.partial(display_vehicles_attention, env=env ))
+
+    model = SAC("MlpPolicy", env,
+                learning_starts=6000,
+                tensorboard_log="test_highwat_sac/", verbose=1)
+    model.learn(total_timesteps=10000, log_interval=4)
+    model.save("sac_pendulum")
+
+    del model # remove to demonstrate saving and loading
+
+    model = SAC.load("sac_pendulum")
+
+    obs = env.reset()
+    while True:
+        action, _states = model.predict(obs, deterministic=True)
+        obs, reward, done, info = env.step(action)
+        env.render()
+        if done:
+          obs = env.reset()
+    # for t in range(10000):
+    #     obs, rew, done, info = env.step(np.array([0,0]))
+    #     env.render()
+    #     if done:
+    #         env.reset()
+
+        
+if __name__ == "__main__":
+    cli()
