@@ -78,6 +78,7 @@ def cli(algo, clearml):
 @click.option("--norm_rew", is_flag=True, help="normalize reward")
 @click.option("--epi_stps", default=2048, help="max steps per episode")
 @click.option("--car_num", default=50, help="num of genereted vehicles on the opposit lane")
+@click.option("--yaw_rate", is_flag=True, help="add yaw_rate to the observation")
 
 @click.option("--lrange", cls=PythonLiteralOption, default=[4,6],
         help="obstacle length range")
@@ -105,6 +106,7 @@ def sac_run(gymid,
             norm_rew,
             epi_stps,
             car_num,
+            yaw_rate,
             lrange, wrange, orange, srange, frange):
 
     exp_name = "obstacle_sac"
@@ -114,6 +116,7 @@ def sac_run(gymid,
     env.configure({
         "duration": epi_stps,  # [s]
         "vehicles_count": car_num,
+        "obs_yaw_rate": yaw_rate,
         "obst_width_range": wrange,
         "obst_length_range": lrange,
         "obst_heading_range": orange,

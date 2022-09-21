@@ -45,6 +45,7 @@ class ObstacleEnv(AbstractEnv):
                 "steering_range": [-np.pi / 16.0, np.pi / 16.0],
                 "dynamical": True,
             },
+            "obs_yaw_rate": True,
             "lanes_count": 2,
             "vehicles_count": 50,
             "exclude_src_lane": True,
