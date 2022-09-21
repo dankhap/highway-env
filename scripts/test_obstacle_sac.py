@@ -77,6 +77,7 @@ def cli(algo, clearml):
 @click.option("--dt", default=0.02, help="rate of simulation")
 @click.option("--norm_rew", is_flag=True, help="normalize reward")
 @click.option("--epi_stps", default=2048, help="max steps per episode")
+@click.option("--car_num", default=50, help="num of genereted vehicles on the opposit lane")
 
 @click.option("--lrange", cls=PythonLiteralOption, default=[4,6],
         help="obstacle length range")
@@ -103,6 +104,7 @@ def sac_run(gymid,
             dt,
             norm_rew,
             epi_stps,
+            car_num,
             lrange, wrange, orange, srange, frange):
 
     exp_name = "obstacle_sac"
@@ -110,6 +112,8 @@ def sac_run(gymid,
 
     env = gym.make("obstacle-v0", render_mode='rgb_array')
     env.configure({
+        "duration": epi_stps,  # [s]
+        "vehicles_count": car_num,
         "obst_width_range": wrange,
         "obst_length_range": lrange,
         "obst_heading_range": orange,

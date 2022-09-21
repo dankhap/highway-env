@@ -575,8 +575,15 @@ class ObstacleObservation(KinematicFlattenObservation):
         df = pd.DataFrame.from_records(records)[self.features]
         return df
 
+    def observe(self) -> np.ndarray:
+        obs = super().observe()
+        d_obs = np.array([self.observer_vehicle.yaw_rate])
+        obs = np.concatenate((d_obs, obs))
+        return obs
+
+
     def space(self) -> spaces.Space:
-        return spaces.Box(shape=((self.vehicles_count + self.additional_obs) * len(self.features),), low=-np.inf, high=np.inf, dtype=np.float32)
+        return spaces.Box(shape=((self.vehicles_count + self.additional_obs + 1) * len(self.features),), low=-np.inf, high=np.inf, dtype=np.float32)
 
 class ExitContinuousObservation(ExitObservation):
 

@@ -31,7 +31,15 @@ def display_vehicles_attention(agent_surface,
 def main():
     env = gym.make("obstacle-v0", render_mode='rgb_array')
     env.configure({
-    "manual_control": True
+    "manual_control": True,
+        "duration": 20,  # [s]
+        "vehicles_count": 20,
+        "obst_width_range": [2,4],
+        "obst_length_range": [4,6],
+        "obst_heading_range": [-1,1],
+        "obst_side_range": [1,2],
+        "obst_friction_range": [14,16], #15
+    "normalize_reward": False
     })
     obs = env.reset()
 
@@ -39,12 +47,16 @@ def main():
     env.viewer.set_agent_display(functools.partial(display_vehicles_attention, env=env ))
 
     obs = env.reset()
-    while True:
-        action, _states = model.predict(obs, deterministic=True)
+    obs_db = []
+    act_db = []
+    for t in range(100):
         obs, reward, done, info = env.step(np.array([0,0]))
-        env.render()
+        obs_db.append(obs)
+        act_db.append()
         if done:
           obs = env.reset()
+
+    print(len(obs_db))
     # for t in range(10000):
     #     obs, rew, done, info = env.step(np.array([0,0]))
     #     env.render()

@@ -43,26 +43,27 @@ class ObstacleEnv(AbstractEnv):
             "action": {
                 "type": "ContinuousAction",
                 "steering_range": [-np.pi / 16.0, np.pi / 16.0],
-                #"dynamical": True,
+                "dynamical": True,
             },
             "lanes_count": 2,
             "vehicles_count": 50,
             "exclude_src_lane": True,
             "controlled_vehicles": 1,
-            "duration": 40,  # [s]
+            "duration": 20,  # [s]
             "ego_spacing": 2,
             "vehicles_density": 0.5,
-            "on_target_reward": 100,   #reward when reaching the original lane after the obstacle
-            "time_pass_reward": 0.1,    # each step adds a negative cost to the reward
-            "offroad_reward":   1,    # each step adds a negative cost to the reward
-            "collision_reward": 1,    # The reward received when colliding with a vehicle.
+            "opposit_lane_reward": 1,  # reward on each timestep while on the opposite lane
+            "on_target_reward": 200,   #reward when reaching the original lane after the obstacle
+            "time_pass_reward": 0.0, # 0.1,    # each step adds a negative cost to the reward
+            "offroad_reward":   0, #1,    # each step adds a negative cost to the reward
+            "collision_reward": 0, #1,    # The reward received when colliding with a vehicle.
                                        # zero for other lanes.
             "high_speed_reward": 0.0,  # The reward received when driving at full speed, linearly mapped to zero for
                                        # lower speeds according to config["reward_speed_range"].
             "lane_change_reward": 0,   # The reward received at each lane change action.
             "adv_to_target_reward": 1,
-            "spawn_probability": 0.5,
-            "reward_speed_range": [20, 30],
+            "spawn_probability":0, # 0.5,
+            "reward_speed_range":0, #: [20, 30],
             "normalize_reward": True,
             "offroad_terminal": True,
             "real_time_rendering": False,
@@ -147,8 +148,9 @@ class ObstacleEnv(AbstractEnv):
         return v
     
     def _set_target(self, vehicle):
-        obst_end = self.road.objects[-1].polygon()[1:].T[0].max()
-        target_x = obst_end + Vehicle.LENGTH*2 
+        self.obst_end = self.road.objects[-1].polygon()[1:].T[0].max()
+        # target_x = obst_end + Vehicle.LENGTH*2 
+        target_x = self.obst_end + 100
         target_y = vehicle.position[1]
         self.target = np.array([target_x, target_y])
         self.target_orient = vehicle.heading
@@ -194,6 +196,9 @@ class ObstacleEnv(AbstractEnv):
         return passed_obst and on_lane and oriented
 
 
+    def _is_on_opposit_lane(self):
+        pass
+
     def _reward(self, action: Action) -> float:
         """
         The reward is defined to foster driving at high speed, on the rightmost lanes, and to avoid collisions.
@@ -205,21 +210,25 @@ class ObstacleEnv(AbstractEnv):
         return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
-        adv_to_target = 0.0
 
-        if self.vehicle.position[0] < self.target[0]: # vehicle didnt pass obstacle
-            current_dist = np.linalg.norm(self.target - self.vehicle.position)
-            adv_to_target = self.previuos_dist - current_dist
-            if self.config["normalize_reward"]:
-                adv_to_target /= self.initial_target_dist
-            self.previuos_dist = current_dist
+        current_dist = np.linalg.norm(self.target - self.vehicle.position)
+        adv_to_target = self.previuos_dist - current_dist
+        if self.config["normalize_reward"]:
+            adv_to_target /= self.initial_target_dist
+        self.previuos_dist = current_dist
 
+        wrong_lane_cost = 0.0
+        if self.road.network.get_lane(("2", "3", 0)).on_lane(self.vehicle.position):
+            wrong_lane_cost = -0.3
+        reached_target = current_dist < 5 and self.vehicle.on_road
+            
         return {
             "collision_reward": -float(self.vehicle.crashed),
             "adv_to_target_reward": adv_to_target,
             "time_pass_reward": -1.0,
-            "on_target_reward": float(self._passed_obstacle()),
-            "offroad_reward": float(not self.vehicle.on_road)
+            "on_target_reward": float(reached_target),
+            "offroad_reward": float(not self.vehicle.on_road),
+            "opposit_lane_reward": wrong_lane_cost
             } # type: ignore
 
     def _spawn_vehicle(self,
@@ -260,13 +269,14 @@ class ObstacleEnv(AbstractEnv):
                               vehicle in self.controlled_vehicles or not (is_leaving(vehicle) or vehicle.route is None)]
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:
-        obs, reward, terminated, _, info = super().step(action)
+        obs, reward, terminated, trancated, info = super().step(action)
+        done = terminated or trancated
         if self.render_mode == 'rgb_array':
             self.render()
         # self._clear_vehicles()
         # self._spawn_vehicle(spawn_probability=self.config["spawn_probability"])
         # return obs, reward, terminated, truncated, info
-        return obs, reward, terminated, info
+        return obs, reward, done, info
 
     def _on_any_lane(self) -> bool:
         lane_idx = self.road.network.get_closest_lane_index(self.vehicle.position)
@@ -276,7 +286,7 @@ class ObstacleEnv(AbstractEnv):
         """The episode is over if the ego vehicle crashed."""
         offroad = self.config["offroad_terminal"] and not self._on_any_lane()
         failed = self.vehicle.crashed or offroad
-        success = self._passed_obstacle()
+        success = self.previuos_dist< 5 and self.vehicle.on_road
 
         if success:
             print("#################")

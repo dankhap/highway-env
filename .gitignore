@@ -15,6 +15,7 @@ _build
 
 # Editor files
 .idea
+.nvim
 
 # Test files
 .pytest_cache
