@@ -33,10 +33,10 @@ class ObstacleEnv(AbstractEnv):
         config.update({
             "observation": {
                 "type": "ObstacleObservation",
-                "additional_obs": 4
+                "additional_obs": 4,
                 # "vehicles_count": 5,
                 # "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
-                # "absolute" : False,
+                # "absolute" : True,
                 # "normalize" : False,
                 # "clip": False
             },
