@@ -59,7 +59,7 @@ def display_vehicles_attention(agent_surface,
                          1)
     # print(f"drawing for step {current_step}")
     # sleep(1)
-    for obv in obs_db[current_step:5]:
+    for obv in obs_db[current_step:current_step + 5]:
     # for obv in obs_db:
         vehicle_poses = obv[1:].reshape(max_vehicles + max_obj, -1)[max_obj:][:,1:3]
         vehicle_poses = get_global_pos(vehicle_poses, env)
@@ -74,7 +74,7 @@ def display_vehicles_attention(agent_surface,
     sim_surface.blit(attention_surface, (0, 0))
 
 def main():
-    env = gym.make("obstacle-v0", render_mode='rgb_array_not')
+    env = gym.make("obstacle-v0", render_mode='rgb_array')
     env.configure({
     "manual_control": False,
         "policy_frequency": 2, #1,  # [Hz]
@@ -122,7 +122,7 @@ def main():
         "real_time_rendering": True,
     "normalize_reward": False
     })
-    # obs = env.reset()
+    obs = env.reset()
     print(f"got {len(obs_db)}")
 
     env.render()
@@ -130,8 +130,8 @@ def main():
     env.seed(42)
     obs = env.reset()
 
-    for action in act_db:
-        print(f"the action:{action}")
+    for i, action in enumerate(act_db):
+        print(f"{i} the action:{action}")
         obs, _, done, _ = env.step(action)
         if done:
           obs = env.reset()

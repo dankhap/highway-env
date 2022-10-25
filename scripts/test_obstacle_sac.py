@@ -143,11 +143,20 @@ def sac_run(gymid,
     model.learn(total_timesteps=tsteps, log_interval=4)
     model.save(f"{exp_name}/model")
 
-def main():
+def eval_policy():
     env = gym.make("obstacle-v0", render_mode='rgb_array')
-    # env.configure({
-    # "manual_control": True
-    # })
+    env.configure({
+        "duration": 2048,  # [s]
+        "vehicles_count": 20,
+        "obs_yaw_rate": True,
+        "obst_width_range": [2,4],
+        "obst_length_range": [4,6],
+        "obst_heading_range": [-1,1],
+        # "obst_ego_dist_range": wrange,
+        "obst_side_range": [1,2],
+        "obst_friction_range": [14,16], #15
+        "normalize_reward": False,
+    })
     obs = env.reset()
 
     env.render()
@@ -156,12 +165,8 @@ def main():
     model = SAC("MlpPolicy", env,
                 learning_starts=6000,
                 tensorboard_log="test_highwat_sac/", verbose=1)
-    model.learn(total_timesteps=10000, log_interval=4)
-    model.save("sac_pendulum")
 
-    del model # remove to demonstrate saving and loading
-
-    model = SAC.load("sac_pendulum")
+    model = SAC.load("obstacle_sac/model")
 
     obs = env.reset()
     while True:
@@ -170,12 +175,8 @@ def main():
         env.render()
         if done:
           obs = env.reset()
-    # for t in range(10000):
-    #     obs, rew, done, info = env.step(np.array([0,0]))
-    #     env.render()
-    #     if done:
-    #         env.reset()
 
         
 if __name__ == "__main__":
-    cli()
+    # cli()
+    eval_policy()

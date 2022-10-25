@@ -30,7 +30,7 @@ def forward_obv_x(obstacle_obv, x_dist):
     obstacle_obv[1] += x_dist
     return obstacle_obv
 
-class DummyPreditor(PredictionService):
+class DummyPredictor(PredictionService):
     def __init__(self, env,pred_horizon, init_obv) -> None:
         super().__init__(env, pred_horizon)
         self.current_obv = init_obv
