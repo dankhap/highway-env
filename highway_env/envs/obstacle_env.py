@@ -302,5 +302,6 @@ class ObstacleEnv(AbstractEnv):
 register(
     id='obstacle-v0',
     entry_point='highway_env.envs:ObstacleEnv',
+    max_episode_steps=100,
 )
 

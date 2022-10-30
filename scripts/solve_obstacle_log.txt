@@ -4,9 +4,9 @@
 1. fix offroad flag on lane change - DONE
 1. in reward give only static far away target and remove other rewards DONE
 1. try without cars - DONE
-1. add time penalty on opposit lane
+1. add time penalty on opposit lane - DONE
 1. change passed condition (pass obstacle and enter original lane)
 1. change vehicle spawning
-1. solve simple environemnt
-1. solve env on broader range
+1. solve simple environemnt - DONE
+1. solve env on broader range - DONE
 
