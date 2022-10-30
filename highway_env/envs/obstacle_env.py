@@ -73,7 +73,8 @@ class ObstacleEnv(AbstractEnv):
             "obst_heading_range": [-np.pi*0.25, np.pi*0.25],
             "obst_ego_dist_range": [15,25],
             "obst_side_range": [0,4],
-            "obst_friction_range": [10,20] #15
+            "obst_friction_range": [10,20], #15
+            "obst_vlen_range": [0.9,1.1] #1
         })
         return config
 
@@ -135,7 +136,7 @@ class ObstacleEnv(AbstractEnv):
         obs = Obstacle(self.road, lane.position(x0, side_dist),heading,0, width, length)
         return obs
 
-    def _create_ego_bicycle(self, lane_idx, friction, speed):
+    def _create_ego_bicycle(self, lane_idx, friction, speed, vlen_scale):
         lane = self.road.network.get_lane(lane_idx)
         default_spacing = 12+1.0*10
         offset = default_spacing * np.exp(-5 / 40 )
@@ -145,7 +146,12 @@ class ObstacleEnv(AbstractEnv):
             else:
                 speed = self.road.np_random.uniform(Vehicle.DEFAULT_INITIAL_SPEEDS[0], Vehicle.DEFAULT_INITIAL_SPEEDS[1])
         x0 = offset*3
-        v = BicycleVehicle(self.road,  lane.position(x0, 0), lane.heading_at(x0), speed, friction_coeff=friction)
+        v = BicycleVehicle(self.road,
+                            lane.position(x0,0),
+                            lane.heading_at(x0),
+                            speed,
+                            friction_coeff=friction,
+                            length_scale=vlen_scale)
         return v
     
     def _set_target(self, vehicle):
@@ -168,10 +174,11 @@ class ObstacleEnv(AbstractEnv):
         rnd_ego_dist = self.np_random.uniform(*self.config["obst_ego_dist_range"])
         rnd_side = self.np_random.uniform(*self.config["obst_side_range"])
         rnd_friction = self.np_random.uniform(*self.config["obst_friction_range"])
+        rnd_vlen = self.np_random.uniform(*self.config["obst_vlen_range"])
 
         self.controlled_vehicles = []
         for others in other_per_controlled:
-            vehicle = self._create_ego_bicycle(("0", "1", 0), rnd_friction, 0)
+            vehicle = self._create_ego_bicycle(("0", "1", 0), rnd_friction, 0, rnd_vlen)
             vehicle = self.action_type.vehicle_class(self.road, vehicle.position, vehicle.heading, vehicle.speed)
             self.controlled_vehicles.append(vehicle)
             self.road.vehicles.append(vehicle)
