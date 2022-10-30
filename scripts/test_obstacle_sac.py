@@ -143,21 +143,29 @@ def sac_run(gymid,
     model.learn(total_timesteps=tsteps, log_interval=4)
     model.save(f"{exp_name}/model")
 
-def eval_policy():
+def extend_range(r, scale, min=0, max=9999):
+    rc = (r - np.mean(r)) * scale
+    rc += np.mean(r)
+    rc[rc<min] = min
+    rc[rc>max] = max
+    return rc
+
+def eval_policy(num_episodes, range_scale):
     env = gym.make("obstacle-v0", render_mode='rgb_array')
     env.configure({
         "duration": 2048,  # [s]
         "vehicles_count": 20,
         "obs_yaw_rate": True,
-        "obst_width_range": [2,4],
-        "obst_length_range": [4,6],
+        "obst_width_range": extend_range([2,4],range_scale),
+        "obst_length_range": extend_range([4,6],range_scale),
         "obst_heading_range": [-1,1],
         # "obst_ego_dist_range": wrange,
         "obst_side_range": [1,2],
-        "obst_friction_range": [14,16], #15
+        "obst_friction_range": extend_range([14,16],range_scale), #15
         "normalize_reward": False,
     })
     obs = env.reset()
+    rewards = np.zeros(num_episodes)
 
     env.render()
     env.viewer.set_agent_display(functools.partial(display_vehicles_attention, env=env ))
@@ -169,14 +177,19 @@ def eval_policy():
     model = SAC.load("obstacle_sac/model")
 
     obs = env.reset()
-    while True:
-        action, _states = model.predict(obs, deterministic=True)
-        obs, reward, done, info = env.step(action)
-        env.render()
-        if done:
-          obs = env.reset()
+
+    for i in range(num_episodes):
+        done = False
+        while not done:
+            action, _ = model.predict(obs, deterministic=True)
+            obs, r, done, _ = env.step(action)
+            rewards[i] += r
+            env.render()
+            if done:
+              obs = env.reset()
+    print(f"avg total reward per episode: {np.mean(rewards)}")
 
         
 if __name__ == "__main__":
     # cli()
-    eval_policy()
+    eval_policy(num_episodes=5, range_scale=2)
