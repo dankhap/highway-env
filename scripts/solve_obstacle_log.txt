@@ -14,7 +14,7 @@ evaluation on larger ranges:
 problem is too easy, range scale of 2X still easily solvable.
 ideas to make problem harder:
 
-1. play with bicycle model car length
+1. play with bicycle model car length - DONE, hard to get noticable effect
 1. add action noise
 1. more varied density, so agent HAS to wait behind obstacle
 1. when randomizing obstacle, try again if obstacle make the environemnt un-beatable

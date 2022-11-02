@@ -52,7 +52,7 @@ class ObstacleEnv(AbstractEnv):
             "controlled_vehicles": 1,
             "duration": 20,  # [s]
             "ego_spacing": 2,
-            "vehicles_density": 0.5,
+            "vehicles_density": 0.5, #0.8 , #0.5
             "opposit_lane_reward": 1,  # reward on each timestep while on the opposite lane
             "on_target_reward": 200,   #reward when reaching the original lane after the obstacle
             "time_pass_reward": 0.0, # 0.1,    # each step adds a negative cost to the reward
@@ -112,6 +112,7 @@ class ObstacleEnv(AbstractEnv):
         lane = self.road.network.get_lane((_from, _to, _id))
         if speed is None:
             if lane.speed_limit is not None:
+                # speed = self.road.np_random.uniform(0.7*lane.speed_limit, 0.8*lane.speed_limit)
                 speed = self.road.np_random.uniform(0.7*lane.speed_limit, 0.8*lane.speed_limit)
             else:
                 speed = self.road.np_random.uniform(Vehicle.DEFAULT_INITIAL_SPEEDS[0], Vehicle.DEFAULT_INITIAL_SPEEDS[1])

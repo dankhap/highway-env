@@ -162,6 +162,7 @@ def eval_policy(num_episodes, range_scale):
         # "obst_ego_dist_range": wrange,
         "obst_side_range": [1,2],
         "obst_friction_range": extend_range([14,16],range_scale*5), #15
+        "obst_vlen_range": extend_range([0.9,1.1],  range_scale*5), #1
         "normalize_reward": False,
     })
     obs = env.reset()
