@@ -239,8 +239,14 @@ class RoadNetwork(object):
             rotation = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
             origin = rotation @ origin
             end = rotation @ end
-            line_types = [LineType.CONTINUOUS_LINE if lane == 0 else LineType.STRIPED,
-                          LineType.CONTINUOUS_LINE if lane == lanes - 1 or direction[lane + 1] != direction[lane] else LineType.NONE]
+            up_line = LineType.CONTINUOUS_LINE if lane == lanes - 1 or direction[lane + 1] != direction[lane] else LineType.STRIPED
+            if lane == 0:
+                down_line = LineType.CONTINUOUS_LINE 
+            elif lane < lanes-1:
+                down_line = LineType.STRIPED 
+            else:
+                down_line = LineType.CONTINUOUS
+            line_types = [up_line, down_line ]
             # net.add_lane(na,nb, StraightLane(origin, end, line_types=line_types, speed_limit=speed_limit))
             net.add_lane(*nodes_str, StraightLane(origin, end, line_types=line_types, speed_limit=speed_limit))
         return net

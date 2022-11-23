@@ -164,6 +164,7 @@ def eval_policy(num_episodes, range_scale):
         "obst_friction_range": extend_range([14,16],range_scale*5), #15
         "obst_vlen_range": extend_range([0.9,1.1],  range_scale*5), #1
         "normalize_reward": False,
+        "lanes_count": 3
     })
     obs = env.reset()
     rewards = np.zeros(num_episodes)
@@ -193,4 +194,4 @@ def eval_policy(num_episodes, range_scale):
         
 if __name__ == "__main__":
     # cli()
-    eval_policy(num_episodes=5, range_scale=2)
+    eval_policy(num_episodes=5, range_scale=1.5)

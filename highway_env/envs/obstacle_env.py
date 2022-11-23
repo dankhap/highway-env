@@ -84,9 +84,16 @@ class ObstacleEnv(AbstractEnv):
 
     def _create_road(self) -> None:
         """Create a road composed of straight adjacent lanes."""
-        self.road = Road(network=RoadNetwork.opposit_lanes_network(self.config["lanes_count"],
+        lane_count = self.config["lanes_count"]
+        # lane_count = 3
+        opposit_lanes = lane_count - 1
+        self.other_lane_idx = ("2","3",lane_count-2)
+        # self.other_lane_idx = ("2","3",0)
+        
+        self.road = Road(network=RoadNetwork.opposit_lanes_network(lane_count,
                                                                    length=1000,
-                                                                   direction=[False, True],
+                                                                   # direction=[False, True],
+                                                                   direction=[False]*opposit_lanes +[True],
                                                                    speed_limit=30),
                          np_random=self.np_random, record_history=self.config["show_trajectories"])
 
@@ -123,6 +130,8 @@ class ObstacleEnv(AbstractEnv):
         x0 += offset * self.road.np_random.uniform(0.9, 1.1)
         other_vehicles_type = utils.class_from_path(self.config["other_vehicles_type"])
         v = other_vehicles_type(self.road,  lane.position(x0, 0), lane.heading_at(x0), speed)
+        if hasattr(v, "enable_lane_change"):
+            v.enable_lane_change = False
         return v
 
     def _create_obstacle(self, lane_idx: Tuple[str, str, int], 
@@ -176,14 +185,19 @@ class ObstacleEnv(AbstractEnv):
         rnd_side = self.np_random.uniform(*self.config["obst_side_range"])
         rnd_friction = self.np_random.uniform(*self.config["obst_friction_range"])
         rnd_vlen = self.np_random.uniform(*self.config["obst_vlen_range"])
+        other_lane_lat = self.np_random.choice(range(self.config["lanes_count"]-1),1,p=0.5)
+        ego_lane_idx = ("0", "1", 0)
+        # ego_lane_idx = ("2", "3", 0)
+        # self.other_lane_idx = ("2","3",1)
+        self.other_lane_idx = ("2","3",other_lane_lat)
 
         self.controlled_vehicles = []
         for others in other_per_controlled:
-            vehicle = self._create_ego_bicycle(("0", "1", 0), rnd_friction, 0, rnd_vlen)
+            vehicle = self._create_ego_bicycle(ego_lane_idx, rnd_friction, 0, rnd_vlen)
             vehicle = self.action_type.vehicle_class(self.road, vehicle.position, vehicle.heading, vehicle.speed)
             self.controlled_vehicles.append(vehicle)
             self.road.vehicles.append(vehicle)
-            obst = self._create_obstacle(("0", "1", 0),
+            obst = self._create_obstacle(ego_lane_idx,
                                             width=rnd_width,
                                             length=rnd_length,
                                             ego_dist=rnd_ego_dist,
@@ -192,7 +206,7 @@ class ObstacleEnv(AbstractEnv):
             self.road.objects.append(obst)
             self._set_target(vehicle)
             for _ in range(others):
-                vehicle = self.create_random_reverse(lane_idx=("2", "3", 0),  
+                vehicle = self.create_random_reverse(lane_idx=self.other_lane_idx,  
                                                      spacing=1 / self.config["vehicles_density"])
                 # vehicle.randomize_behavior()
                 self.road.vehicles.append(vehicle)
