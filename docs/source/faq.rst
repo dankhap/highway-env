@@ -8,6 +8,15 @@ Frequently Asked Questions
 This is a list of Frequently Asked Questions about highway-env.  Feel free to
 suggest new entries!
 
+When I try to make an environment, I get an error ``gym.error.NameNotFound: Environment highway doesn't exist.``
+    This is probably because you do not have highway-env installed, but are instead working with a local copy of the
+    repository. In that case, you need to run the following code first to register the environments.
+
+.. code-block:: python
+
+  import highway_env
+  highway_env.register_highway_envs()
+
 I try to train an agent using the Kinematics Observation and an MLP model, but the resulting policy is not optimal. Why?
     I also tend to get reasonable but sub-optimal policies using this observation-model pair.
     In :cite:`Leurent2019social`, we argued that a possible reason is that the MLP output depends on the order of
@@ -31,7 +40,6 @@ My videos are too fast / have a low framerate.
 .. code-block:: python
 
   import gym
-  import highway_env
 
   # Wrap the env by a RecordVideo wrapper
   env = gym.make("highway-v0")
@@ -43,10 +51,10 @@ My videos are too fast / have a low framerate.
   env.unwrapped.set_record_video_wrapper(env)
 
   # Record a video as usual
-  obs = env.reset()
-  done = False:
-  while not done:
+  obs, info = env.reset()
+  done = truncated = False:
+  while not (done or truncated):
       action = env.action_space.sample()
-      obs, reward, done, info = env.step(action)
+      obs, reward, done, truncated, info = env.step(action)
       env.render()
   env.close()

@@ -30,7 +30,8 @@ class RoadObject(ABC):
         :param speed: cartesian speed of object in the surface
         """
         self.road = road
-        self.position = np.array(position, dtype=np.float)
+        self.position = np.array(position, dtype=np.float64)
+
         self.heading = heading
         self.speed = speed
         self.lane_index = self.road.network.get_closest_lane_index(self.position, self.heading) if self.road else np.nan
@@ -100,7 +101,7 @@ class RoadObject(ABC):
 
     def _is_colliding(self, other, dt):
         # Fast spherical pre-check
-        if np.linalg.norm(other.position - self.position) > self.diagonal + self.speed * dt:
+        if np.linalg.norm(other.position - self.position) > (self.diagonal + other.diagonal) / 2 + self.speed * dt:
             return False, False, np.zeros(2,)
         # Accurate rectangular check
         return utils.are_polygons_intersecting(self.polygon(), other.polygon(), self.velocity * dt, other.velocity * dt)

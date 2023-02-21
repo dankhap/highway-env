@@ -4,7 +4,7 @@ import pygame
 import seaborn as sns
 import torch as th
 from highway_env.utils import lmap
-from stable_baselines3 import PPO
+from stable_baselines3 import DQN
 from torch.distributions import Categorical
 import torch
 import torch.nn as nn
@@ -352,16 +352,17 @@ def compute_vehicles_attention(env, model):
 
 if __name__ == "__main__":
     train = True
+    log_dir_name = "highway_attention_dqn/"
     if train:
-        n_cpu = 4
+        n_cpu = 1
         policy_kwargs = dict(
             features_extractor_class=CustomExtractor,
             features_extractor_kwargs=attention_network_kwargs,
         )
         env = make_vec_env(make_configure_env, n_envs=n_cpu, seed=0, vec_env_cls=SubprocVecEnv, env_kwargs=env_kwargs)
         steps = 400000
-        batch_size = 2048
-        total_timesteps = 40000000
+        batch_size = 128
+        total_timesteps = 30000000
 ###
 
 
@@ -375,26 +376,27 @@ if __name__ == "__main__":
     #               n_epochs=80
     #                 )
 ###
-        model = PPO("MlpPolicy", env,
-                    n_steps=steps // n_cpu,
+        model = DQN("MlpPolicy", env,
                     batch_size=batch_size,
+                    gamma=0.95,
                     learning_rate=2e-3,
                     policy_kwargs=policy_kwargs,
                     verbose=2,
-                    tensorboard_log="highway_attention_ppo/")
+                    target_update_interval=512,
+                    tensorboard_log=log_dir_name)
         # Train the agent
         model.learn(total_timesteps=total_timesteps)#200*1000)
         # Save the agent
-        model.save("highway_attention_ppo/model")
+        model.save(f"{log_dir_name}/model")
 
-    model = PPO.load("highway_attention_ppo/model")
+    model = DQN.load(f"{log_dir_name}/model")
     env = make_configure_env(**env_kwargs)
     env.render()
     env.viewer.set_agent_display(functools.partial(display_vehicles_attention, env=env, model=model))
     for _ in range(5):
-        obs, info = env.reset()
-        done = truncated = False
-        while not (done or truncated):
+        obs = env.reset()
+        done = False
+        while not done:
             action, _ = model.predict(obs)
-            obs, reward, done, truncated, info = env.step(action)
+            obs, reward, done, info = env.step(action)
             env.render()

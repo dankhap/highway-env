@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from itertools import product
 from typing import List, Dict, TYPE_CHECKING, Optional, Union, Tuple
 from gym import spaces
@@ -72,7 +73,7 @@ class GrayscaleObservation(ObservationType):
         self.observation_shape = observation_shape
         self.shape = (stack_size, ) + self.observation_shape
         self.weights = weights
-        self.obs = np.zeros(self.shape)
+        self.obs = np.zeros(self.shape, dtype=np.uint8)
 
         # The viewer configuration can be different between this observation and env.render() (typically smaller)
         viewer_config = env.config.copy()
@@ -212,9 +213,9 @@ class KinematicObservation(ObservationType):
                                                          sort=self.order == "sorted")
         if close_vehicles:
             origin = self.observer_vehicle if not self.absolute else None
-            df = df.append(pd.DataFrame.from_records(
+            df = pd.concat([df, pd.DataFrame.from_records(
                 [v.to_dict(origin, observe_intentions=self.observe_intentions)
-                 for v in close_vehicles[-self.vehicles_count + 1:]])[self.features],
+                 for v in close_vehicles[-self.vehicles_count + 1:]])[self.features]],
                            ignore_index=True)
         # Normalize and clip
         if self.normalize:
@@ -222,7 +223,7 @@ class KinematicObservation(ObservationType):
         # Fill missing rows
         if df.shape[0] < self.vehicles_count:
             rows = np.zeros((self.vehicles_count - df.shape[0], len(self.features)))
-            df = df.append(pd.DataFrame(data=rows, columns=self.features), ignore_index=True)
+            df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)
         # Reorder
         df = df[self.features]
         obs = df.values.copy()
@@ -266,7 +267,8 @@ class OccupancyGridObservation(ObservationType):
         self.features = features if features is not None else self.FEATURES
         self.grid_size = np.array(grid_size) if grid_size is not None else np.array(self.GRID_SIZE)
         self.grid_step = np.array(grid_step) if grid_step is not None else np.array(self.GRID_STEP)
-        grid_shape = np.asarray(np.floor((self.grid_size[:, 1] - self.grid_size[:, 0]) / self.grid_step), dtype=np.int)
+        grid_shape = np.asarray(np.floor((self.grid_size[:, 1] - self.grid_size[:, 0]) / self.grid_step),
+                                dtype=np.uint8)
         self.grid = np.zeros((len(self.features), *grid_shape))
         self.features_range = features_range
         self.absolute = absolute
@@ -315,7 +317,7 @@ class OccupancyGridObservation(ObservationType):
             # Fill-in features
             for layer, feature in enumerate(self.features):
                 if feature in df.columns:  # A vehicle feature
-                    for _, vehicle in df.iterrows():
+                    for _, vehicle in df[::-1].iterrows():
                         x, y = vehicle["x"], vehicle["y"]
                         # Recover unnormalized coordinates for cell index
                         if "x" in self.features_range:
@@ -430,19 +432,19 @@ class KinematicsGoalObservation(KinematicObservation):
 
     def observe(self) -> Dict[str, np.ndarray]:
         if not self.observer_vehicle:
-            return {
-            "observation": np.zeros((len(self.features),)),
-            "achieved_goal": np.zeros((len(self.features),)),
-            "desired_goal": np.zeros((len(self.features),))
-        }
+            return OrderedDict([
+                ("observation", np.zeros((len(self.features),))),
+                ("achieved_goal", np.zeros((len(self.features),))),
+                ("desired_goal", np.zeros((len(self.features),)))
+            ])
 
         obs = np.ravel(pd.DataFrame.from_records([self.observer_vehicle.to_dict()])[self.features])
         goal = np.ravel(pd.DataFrame.from_records([self.env.goal.to_dict()])[self.features])
-        obs = {
-            "observation": obs / self.scales,
-            "achieved_goal": obs / self.scales,
-            "desired_goal": goal / self.scales
-        }
+        obs = OrderedDict([
+            ("observation", obs / self.scales),
+            ("achieved_goal", obs / self.scales),
+            ("desired_goal", goal / self.scales)
+         ])
         return obs
 
 
@@ -462,9 +464,9 @@ class AttributesObservation(ObservationType):
             return spaces.Space()
 
     def observe(self) -> Dict[str, np.ndarray]:
-        return {
-            attribute: getattr(self.env, attribute) for attribute in self.attributes
-        }
+        return OrderedDict([
+            (attribute, getattr(self.env, attribute)) for attribute in self.attributes
+        ])
 
 
 class MultiAgentObservation(ObservationType):
@@ -523,9 +525,9 @@ class ExitObservation(KinematicObservation):
                                                          see_behind=self.see_behind)
         if close_vehicles:
             origin = self.observer_vehicle if not self.absolute else None
-            df = df.append(pd.DataFrame.from_records(
+            df = pd.concat([df, pd.DataFrame.from_records(
                 [v.to_dict(origin, observe_intentions=self.observe_intentions)
-                 for v in close_vehicles[-self.vehicles_count + 1:]])[self.features],
+                 for v in close_vehicles[-self.vehicles_count + 1:]])[self.features]],
                            ignore_index=True)
         # Normalize and clip
         if self.normalize:
@@ -533,7 +535,7 @@ class ExitObservation(KinematicObservation):
         # Fill missing rows
         if df.shape[0] < self.vehicles_count:
             rows = np.zeros((self.vehicles_count - df.shape[0], len(self.features)))
-            df = df.append(pd.DataFrame(data=rows, columns=self.features), ignore_index=True)
+            df = pd.concat([df, pd.DataFrame(data=rows, columns=self.features)], ignore_index=True)
         # Reorder
         df = df[self.features]
         obs = df.values.copy()
@@ -690,6 +692,8 @@ class LidarFlattenObservation(LidarObservation):
 def observation_factory(env: 'AbstractEnv', config: dict) -> ObservationType:
     if config["type"] == "TimeToCollision":
         return TimeToCollisionObservation(env, **config)
+    elif config["type"] == "KinematicObservation":
+        return KinematicObservation(env, **config)
     elif config["type"] == "Kinematics":
         return KinematicObservation(env, **config)
     elif config["type"] == "OccupancyGrid":

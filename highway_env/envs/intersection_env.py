@@ -1,6 +1,5 @@
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Text
 
-from gym.envs.registration import register
 import numpy as np
 
 from highway_env import utils
@@ -26,7 +25,7 @@ class IntersectionEnv(AbstractEnv):
         config = super().default_config()
         config.update({
             "observation": {
-                "type": "Kinematics",
+                "type": "KinematicObservation",
                 "vehicles_count": 15,
                 "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
                 "features_range": {
@@ -59,53 +58,93 @@ class IntersectionEnv(AbstractEnv):
             "arrived_reward": 1,
             "reward_speed_range": [7.0, 9.0],
             "normalize_reward": False,
-            "offroad_terminal": False
+            "offroad_terminal": False,
+            "anycrash_terminal": False,
+            "exclude_src_lane": None,
+            # Original configuration
+            # "COMFORT_ACC_MAX": 6.0,
+            # "COMFORT_ACC_MIN": -3.0,
+            # "regulation_freq": 2,
+            # "yield_duration": 0,
+            "COMFORT_ACC_MAX": 12,
+            "COMFORT_ACC_MIN": -12,
+            "regulation_freq": 15,
+            "yield_duration": 1,
+            "yield_duration_range": None
         })
         return config
 
     def _reward(self, action: int) -> float:
-        # Cooperative multi-agent reward
-        return sum(self._agent_reward(action, vehicle) for vehicle in self.controlled_vehicles) \
-               / len(self.controlled_vehicles)
+        """Aggregated reward, for cooperative agents."""
+        return sum(self._agent_reward(action, vehicle) for vehicle in self.controlled_vehicles
+                   ) / len(self.controlled_vehicles)
+
+    def _rewards(self, action: int) -> Dict[Text, float]:
+        """Multi-objective rewards, for cooperative agents."""
+        agents_rewards = [self._agent_rewards(action, vehicle) for vehicle in self.controlled_vehicles]
+        return {
+            name: sum(agent_rewards[name] for agent_rewards in agents_rewards) / len(agents_rewards)
+            for name in agents_rewards[0].keys()
+        }
 
     def _agent_reward(self, action: int, vehicle: Vehicle) -> float:
-        scaled_speed = utils.lmap(vehicle.speed, self.config["reward_speed_range"], [0, 1])
-        reward = self.config["collision_reward"] * vehicle.crashed \
-                 + self.config["high_speed_reward"] * np.clip(scaled_speed, 0, 1)
-
-        reward = self.config["arrived_reward"] if self.has_arrived(vehicle) else reward
+        """Per-agent reward signal."""
+        rewards = self._agent_rewards(action, vehicle)
+        reward = sum(self.config.get(name, 0) * reward for name, reward in rewards.items())
+        reward = self.config["arrived_reward"] if rewards["arrived_reward"] else reward
+        reward *= rewards["on_road_reward"]
         if self.config["normalize_reward"]:
             reward = utils.lmap(reward, [self.config["collision_reward"], self.config["arrived_reward"]], [0, 1])
-        reward = 0 if not vehicle.on_road else reward
         return reward
 
-    def _is_terminal(self) -> bool:
+    def _agent_rewards(self, action: int, vehicle: Vehicle) -> Dict[Text, float]:
+        """Per-agent per-objective reward signal."""
+        scaled_speed = utils.lmap(vehicle.speed, self.config["reward_speed_range"], [0, 1])
+        return {
+            "collision_reward": vehicle.crashed,
+            "high_speed_reward": np.clip(scaled_speed, 0, 1),
+            "arrived_reward": self.has_arrived(vehicle),
+            "on_road_reward": vehicle.on_road
+        }
+
+    def _is_terminated(self) -> bool:
         return any(vehicle.crashed for vehicle in self.controlled_vehicles) \
                or all(self.has_arrived(vehicle) for vehicle in self.controlled_vehicles) \
-               or self.steps >= self.config["duration"] * self.config["policy_frequency"] \
                or (self.config["offroad_terminal"] and not self.vehicle.on_road)
+
+# improving behaivoir
+           #   or self.steps >= self.config["duration"] * self.config["policy_frequency"] \
+           #   or (self.config["anycrash_terminal"] and any([v.crashed for v in self.road.vehicles])) \
+
+              
 
     def _agent_is_terminal(self, vehicle: Vehicle) -> bool:
         """The episode is over when a collision occurs or when the access ramp has been passed."""
-        return vehicle.crashed \
-            or self.steps >= self.config["duration"] * self.config["policy_frequency"] \
-            or self.has_arrived(vehicle)
+        return (vehicle.crashed or
+                self.has_arrived(vehicle) or
+                self.time >= self.config["duration"])
+
+    def _is_truncated(self) -> bool:
+        return
 
     def _info(self, obs: np.ndarray, action: int) -> dict:
         info = super()._info(obs, action)
         info["agents_rewards"] = tuple(self._agent_reward(action, vehicle) for vehicle in self.controlled_vehicles)
         info["agents_dones"] = tuple(self._agent_is_terminal(vehicle) for vehicle in self.controlled_vehicles)
+        info["other_crushed_count"] = np.sum([v.crashed for v in self.road.vehicles])
+        info["other_crushed"] = any([v.crashed for v in self.road.vehicles])
+        info["other_avg_speed"] = np.mean([v.speed for v in self.road.vehicles])
         return info
 
     def _reset(self) -> None:
         self._make_road()
         self._make_vehicles(self.config["initial_vehicle_count"])
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:
-        obs, reward, done, info = super().step(action)
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, dict]:
+        obs, reward, terminated, truncated, info = super().step(action)
         self._clear_vehicles()
         self._spawn_vehicle(spawn_probability=self.config["spawn_probability"])
-        return obs, reward, done, info
+        return obs, reward, terminated, truncated, info
 
     def _make_road(self) -> None:
         """
@@ -161,7 +200,10 @@ class IntersectionEnv(AbstractEnv):
             net.add_lane("il" + str((corner - 1) % 4), "o" + str((corner - 1) % 4),
                          StraightLane(end, start, line_types=[n, c], priority=priority, speed_limit=10))
 
-        road = RegulatedRoad(network=net, np_random=self.np_random, record_history=self.config["show_trajectories"])
+        road = RegulatedRoad(network=net, np_random=self.np_random, record_history=self.config["show_trajectories"],
+                regulation_freq=self.config["regulation_freq"],
+                yield_duration=self.config["yield_duration"],
+                yield_duration_range=self.config["yield_duration_range"])
         self.road = road
 
     def _make_vehicles(self, n_vehicles: int = 10) -> None:
@@ -173,8 +215,8 @@ class IntersectionEnv(AbstractEnv):
         # Configure vehicles
         vehicle_type = utils.class_from_path(self.config["other_vehicles_type"])
         vehicle_type.DISTANCE_WANTED = 7  # Low jam distance
-        vehicle_type.COMFORT_ACC_MAX = 6
-        vehicle_type.COMFORT_ACC_MIN = -3
+        vehicle_type.COMFORT_ACC_MAX = self.config["COMFORT_ACC_MAX"]
+        vehicle_type.COMFORT_ACC_MIN = self.config["COMFORT_ACC_MIN"]
 
         # Random vehicles
         simulation_steps = 3
@@ -193,7 +235,7 @@ class IntersectionEnv(AbstractEnv):
             destination = self.config["destination"] or "o" + str(self.np_random.randint(1, 4))
             ego_vehicle = self.action_type.vehicle_class(
                              self.road,
-                             ego_lane.position(60 + 5*self.np_random.randn(1), 0),
+                             ego_lane.position(60 + 5*self.np_random.normal(1), 0),
                              speed=ego_lane.speed_limit,
                              heading=ego_lane.heading_at(60))
             try:
@@ -215,15 +257,23 @@ class IntersectionEnv(AbstractEnv):
                        speed_deviation: float = 1.,
                        spawn_probability: float = 0.6,
                        go_straight: bool = False) -> None:
-        if self.np_random.rand() > spawn_probability:
+        if self.np_random.uniform() > spawn_probability:
             return
 
-        route = self.np_random.choice(range(4), size=2, replace=False)
+        exclude = self.config["exclude_src_lane"]
+        if not exclude is None:
+            route = [exclude,0]
+            while route[0] == exclude:
+                route = self.np_random.choice(range(4), size=2, replace=False)
+        else:
+            route = self.np_random.choice(range(4), size=2, replace=False)
+
         route[1] = (route[0] + 2) % 4 if go_straight else route[1]
         vehicle_type = utils.class_from_path(self.config["other_vehicles_type"])
         vehicle = vehicle_type.make_on_lane(self.road, ("o" + str(route[0]), "ir" + str(route[0]), 0),
-                                            longitudinal=longitudinal + 5 + self.np_random.randn() * position_deviation,
-                                            speed=8 + self.np_random.randn() * speed_deviation)
+                                            longitudinal=(longitudinal + 5
+                                                          + self.np_random.normal() * position_deviation),
+                                            speed=8 + self.np_random.normal() * speed_deviation)
         for v in self.road.vehicles:
             if np.linalg.norm(v.position - vehicle.position) < 15:
                 return
@@ -243,10 +293,6 @@ class IntersectionEnv(AbstractEnv):
         return "il" in vehicle.lane_index[0] \
                and "o" in vehicle.lane_index[1] \
                and vehicle.lane.local_coordinates(vehicle.position)[0] >= exit_distance
-
-    def _cost(self, action: int) -> float:
-        """The constraint signal is the occurrence of collisions."""
-        return float(self.vehicle.crashed)
 
 
 class MultiAgentIntersectionEnv(IntersectionEnv):
@@ -292,25 +338,27 @@ class ContinuousIntersectionEnv(IntersectionEnv):
         })
         return config
 
+class MLPIntersectionEnv(IntersectionEnv):
+
+    @classmethod
+    def default_config(cls) -> dict:
+        config = super().default_config()
+        config.update({
+            "observation": {
+                "type": "KinematicFlattenObservation",
+                "vehicles_count": 15,
+                "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
+                "features_range": {
+                    "x": [-100, 100],
+                    "y": [-100, 100],
+                    "vx": [-20, 20],
+                    "vy": [-20, 20],
+                },
+                "absolute": True,
+                "flatten": False,
+                "observe_intentions": False
+            },
+        })
+        return config
+
 TupleMultiAgentIntersectionEnv = MultiAgentWrapper(MultiAgentIntersectionEnv)
-
-
-register(
-    id='intersection-v0',
-    entry_point='highway_env.envs:IntersectionEnv',
-)
-
-register(
-    id='intersection-v1',
-    entry_point='highway_env.envs:ContinuousIntersectionEnv',
-)
-
-register(
-    id='intersection-multi-agent-v0',
-    entry_point='highway_env.envs:MultiAgentIntersectionEnv',
-)
-
-register(
-    id='intersection-multi-agent-v1',
-    entry_point='highway_env.envs:TupleMultiAgentIntersectionEnv',
-)

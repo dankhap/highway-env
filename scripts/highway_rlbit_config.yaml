@@ -1,0 +1,38 @@
+
+exp_name: andromeda_intersection_ppo_cleanrl_dic_vec
+team: andromeda_intersection
+seed: 1
+torch: 
+  device: cuda
+  torch_deterministic: true
+environment:
+  gym_name: intersection-flatten-v0
+  capture_video: true
+  env_num: 18
+  render: false
+trainer:
+  trainer_type: ppo
+  hyperparameters:
+    minibatch_size: 2048
+    buffer_size: 440000
+    learning_rate: 0.0003
+    gae: true
+    gae_lambda: 0.95
+    norm_adv: true
+    clip_coef: 0.2
+    clip_vloss: true
+    ent_coef: 0.001
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    update_epochs: 80
+    target_kl: 0.03
+    learning_rate_schedule: constant
+    gamma: 0.99
+  network_settings:
+    normalize: false
+    hidden_units: 64
+    num_layers: 2
+    activation: tanh
+  keep_checkpoints: 5 # check ml-agnts logic (freq?)
+  max_steps: 10000000
+  summary_freq: 10000

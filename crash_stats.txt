@@ -1,0 +1,36 @@
+current params 0, 2
+total crashes: 71
+average vehicle speed: 5.960361615305548
+average time for episode 4.774129858016968
+
+current params 1, 15
+total crashes: 40
+average vehicle speed: 6.124735661268491
+average time for episode 8.598427891731262
+
+
+
+current params 1, 15, max acc 6 >> 12
+total crashes: 29
+average vehicle speed: 6.361364720725879
+average time for episode 8.354021434783936
+
+counted 2 collisions, step 111, episode 4
+counted 4 collisions, step 113, episode 4
+counted 6 collisions, step 181, episode 7
+counted 7 collisions, step 186, episode 7
+counted 9 collisions, step 284, episode 11
+counted 11 collisions, step 437, episode 18
+counted 13 collisions, step 527, episode 21
+counted 15 collisions, step 546, episode 22
+counted 17 collisions, step 547, episode 22
+counted 19 collisions, step 575, episode 23
+counted 21 collisions, step 670, episode 27
+counted 23 collisions, step 725, episode 30
+counted 25 collisions, step 839, episode 34
+counted 27 collisions, step 1124, episode 46
+counted 29 collisions, step 1173, episode 48
+current params 1, 15
+total crashes: 29
+average vehicle speed: 6.361364720725879
+average time for episode 8.354021434783936
