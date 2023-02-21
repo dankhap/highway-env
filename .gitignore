@@ -25,3 +25,7 @@ _build
 
 **/.vimspector.json
 
+
+obstacle_sac
+scripts/highway_attention_dqn
+scripts/highway_attention_ppo
