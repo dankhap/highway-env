@@ -1,6 +1,5 @@
 from typing import Dict, Tuple, Text
 
-from gym.envs.registration import register
 import numpy as np
 
 from highway_env import utils
@@ -121,11 +120,12 @@ class IntersectionEnv(AbstractEnv):
 
     def _agent_is_terminal(self, vehicle: Vehicle) -> bool:
         """The episode is over when a collision occurs or when the access ramp has been passed."""
-        return vehicle.crashed \
-            or self.has_arrived(vehicle)
+        return (vehicle.crashed or
+                self.has_arrived(vehicle) or
+                self.time >= self.config["duration"])
 
     def _is_truncated(self) -> bool:
-        return self.time >= self.config["duration"]
+        return
 
     def _info(self, obs: np.ndarray, action: int) -> dict:
         info = super()._info(obs, action)
@@ -235,7 +235,7 @@ class IntersectionEnv(AbstractEnv):
             destination = self.config["destination"] or "o" + str(self.np_random.randint(1, 4))
             ego_vehicle = self.action_type.vehicle_class(
                              self.road,
-                             ego_lane.position(60 + 5*self.np_random.randn(1), 0),
+                             ego_lane.position(60 + 5*self.np_random.normal(1), 0),
                              speed=ego_lane.speed_limit,
                              heading=ego_lane.heading_at(60))
             try:
@@ -257,7 +257,7 @@ class IntersectionEnv(AbstractEnv):
                        speed_deviation: float = 1.,
                        spawn_probability: float = 0.6,
                        go_straight: bool = False) -> None:
-        if self.np_random.rand() > spawn_probability:
+        if self.np_random.uniform() > spawn_probability:
             return
 
         exclude = self.config["exclude_src_lane"]
@@ -271,8 +271,9 @@ class IntersectionEnv(AbstractEnv):
         route[1] = (route[0] + 2) % 4 if go_straight else route[1]
         vehicle_type = utils.class_from_path(self.config["other_vehicles_type"])
         vehicle = vehicle_type.make_on_lane(self.road, ("o" + str(route[0]), "ir" + str(route[0]), 0),
-                                            longitudinal=longitudinal + 5 + self.np_random.randn() * position_deviation,
-                                            speed=8 + self.np_random.randn() * speed_deviation)
+                                            longitudinal=(longitudinal + 5
+                                                          + self.np_random.normal() * position_deviation),
+                                            speed=8 + self.np_random.normal() * speed_deviation)
         for v in self.road.vehicles:
             if np.linalg.norm(v.position - vehicle.position) < 15:
                 return
@@ -361,30 +362,3 @@ class MLPIntersectionEnv(IntersectionEnv):
         return config
 
 TupleMultiAgentIntersectionEnv = MultiAgentWrapper(MultiAgentIntersectionEnv)
-
-
-register(
-    id='intersection-v0',
-    entry_point='highway_env.envs:IntersectionEnv',
-)
-
-
-register(
-    id='intersection-flatten-v0',
-    entry_point='highway_env.envs:MLPIntersectionEnv',
-)
-
-register(
-    id='intersection-v1',
-    entry_point='highway_env.envs:ContinuousIntersectionEnv',
-)
-
-register(
-    id='intersection-multi-agent-v0',
-    entry_point='highway_env.envs:MultiAgentIntersectionEnv',
-)
-
-register(
-    id='intersection-multi-agent-v1',
-    entry_point='highway_env.envs:TupleMultiAgentIntersectionEnv',
-)

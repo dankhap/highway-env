@@ -1,6 +1,5 @@
 import numpy as np
 from typing import Tuple, Dict, Text
-from gym.envs.registration import register
 
 from highway_env import utils
 from highway_env.envs import HighwayEnv, CircularLane, Vehicle
@@ -136,12 +135,11 @@ class ExitEnv(HighwayEnv):
         return goal_reached
 
     def _is_terminated(self) -> bool:
-        """The episode is over if the ego vehicle crashed."""
-        return self.vehicle.crashed
+        """The episode is over if the ego vehicle crashed or if the time is out."""
+        return self.vehicle.crashed or self.time >= self.config["duration"]
 
     def _is_truncated(self) -> bool:
-        """The episode is over if the time is out."""
-        return self.time >= self.config["duration"]
+        return False
 
 
 
@@ -151,10 +149,3 @@ class ExitEnv(HighwayEnv):
 #         return dict(super().default_config(),
 #                     observation=dict(type="LidarObservation"))
 
-
-
-
-register(
-    id='exit-v0',
-    entry_point='highway_env.envs:ExitEnv',
-)

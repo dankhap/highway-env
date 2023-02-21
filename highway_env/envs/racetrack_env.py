@@ -1,7 +1,6 @@
 from itertools import repeat, product
 from typing import Tuple, Dict, Text
 
-from gym.envs.registration import register
 import numpy as np
 
 from highway_env import utils
@@ -73,10 +72,10 @@ class RacetrackEnv(AbstractEnv):
         }
 
     def _is_terminated(self) -> bool:
-        return self.vehicle.crashed
+        return self.vehicle.crashed or self.time >= self.config["duration"]
 
     def _is_truncated(self) -> bool:
-        return self.time >= self.config["duration"]
+        return False
 
     def _reset(self) -> None:
         self._make_road()
@@ -192,7 +191,7 @@ class RacetrackEnv(AbstractEnv):
         # Controlled vehicles
         self.controlled_vehicles = []
         for i in range(self.config["controlled_vehicles"]):
-            lane_index = ("a", "b", rng.randint(2)) if i == 0 else \
+            lane_index = ("a", "b", rng.integers(2)) if i == 0 else \
                 self.road.network.random_lane_index(rng)
             controlled_vehicle = self.action_type.vehicle_class.make_on_lane(self.road, lane_index, speed=None,
                                                                              longitudinal=rng.uniform(20, 50))
@@ -210,7 +209,7 @@ class RacetrackEnv(AbstractEnv):
         self.road.vehicles.append(vehicle)
 
         # Other vehicles
-        for i in range(rng.randint(self.config["other_vehicles"])):
+        for i in range(rng.integers(self.config["other_vehicles"])):
             random_lane_index = self.road.network.random_lane_index(rng)
             vehicle = IDMVehicle.make_on_lane(self.road, random_lane_index,
                                               longitudinal=rng.uniform(
@@ -224,9 +223,3 @@ class RacetrackEnv(AbstractEnv):
                     break
             else:
                 self.road.vehicles.append(vehicle)
-
-
-register(
-    id='racetrack-v0',
-    entry_point='highway_env.envs:RacetrackEnv',
-)

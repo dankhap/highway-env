@@ -1,7 +1,8 @@
 import gym
 import pytest
-
 import highway_env
+
+highway_env.register_highway_envs()
 
 action_configs = [
     {"type": "ContinuousAction"},
@@ -17,7 +18,7 @@ def test_action_type(action_config):
     env.reset()
     for _ in range(3):
         action = env.action_space.sample()
-        obs, _, _, _ = env.step(action)
+        obs, _, _, _, _ = env.step(action)
         assert env.action_space.contains(action)
         assert env.observation_space.contains(obs)
     env.close()

@@ -1,6 +1,5 @@
 from typing import Tuple, Dict, Text
 
-from gym.envs.registration import register
 import numpy as np
 
 from highway_env import utils
@@ -56,10 +55,10 @@ class RoundaboutEnv(AbstractEnv):
         }
 
     def _is_terminated(self) -> bool:
-        return self.vehicle.crashed
+        return self.vehicle.crashed or self.time >= self.config["duration"]
 
     def _is_truncated(self) -> bool:
-        return self.time >= self.config["duration"]
+        return False
 
     def _reset(self) -> None:
         self._make_road()
@@ -159,8 +158,8 @@ class RoundaboutEnv(AbstractEnv):
         other_vehicles_type = utils.class_from_path(self.config["other_vehicles_type"])
         vehicle = other_vehicles_type.make_on_lane(self.road,
                                                    ("we", "sx", 1),
-                                                   longitudinal=5 + self.np_random.randn()*position_deviation,
-                                                   speed=16 + self.np_random.randn() * speed_deviation)
+                                                   longitudinal=5 + self.np_random.normal()*position_deviation,
+                                                   speed=16 + self.np_random.normal() * speed_deviation)
 
         if self.config["incoming_vehicle_destination"] is not None:
             destination = destinations[self.config["incoming_vehicle_destination"]]
@@ -174,8 +173,8 @@ class RoundaboutEnv(AbstractEnv):
         for i in list(range(1, 2)) + list(range(-1, 0)):
             vehicle = other_vehicles_type.make_on_lane(self.road,
                                                        ("we", "sx", 0),
-                                                       longitudinal=20*i + self.np_random.randn()*position_deviation,
-                                                       speed=16 + self.np_random.randn() * speed_deviation)
+                                                       longitudinal=20*i + self.np_random.normal()*position_deviation,
+                                                       speed=16 + self.np_random.normal() * speed_deviation)
             vehicle.plan_route_to(self.np_random.choice(destinations))
             vehicle.randomize_behavior()
             self.road.vehicles.append(vehicle)
@@ -183,14 +182,8 @@ class RoundaboutEnv(AbstractEnv):
         # Entering vehicle
         vehicle = other_vehicles_type.make_on_lane(self.road,
                                                    ("eer", "ees", 0),
-                                                   longitudinal=50 + self.np_random.randn() * position_deviation,
-                                                   speed=16 + self.np_random.randn() * speed_deviation)
+                                                   longitudinal=50 + self.np_random.normal() * position_deviation,
+                                                   speed=16 + self.np_random.normal() * speed_deviation)
         vehicle.plan_route_to(self.np_random.choice(destinations))
         vehicle.randomize_behavior()
         self.road.vehicles.append(vehicle)
-
-
-register(
-    id='roundabout-v0',
-    entry_point='highway_env.envs:RoundaboutEnv',
-)

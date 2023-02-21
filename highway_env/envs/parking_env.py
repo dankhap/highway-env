@@ -1,13 +1,16 @@
 from abc import abstractmethod
+from typing import Optional
+
 from gym import Env
-from gym.envs.registration import register
 import numpy as np
 
 from highway_env.envs.common.abstract import AbstractEnv
 from highway_env.envs.common.observation import MultiAgentObservation, observation_factory
 from highway_env.road.lane import StraightLane, LineType
 from highway_env.road.road import Road, RoadNetwork
-from highway_env.vehicle.objects import Landmark
+from highway_env.vehicle.graphics import VehicleGraphics
+from highway_env.vehicle.kinematics import Vehicle
+from highway_env.vehicle.objects import Landmark, Obstacle
 
 
 class GoalEnv(Env):
@@ -67,8 +70,8 @@ class ParkingEnv(AbstractEnv, GoalEnv):
             "normalize": False
         }}
 
-    def __init__(self, config: dict = None) -> None:
-        super().__init__(config)
+    def __init__(self, config: dict = None, render_mode: Optional[str] = None) -> None:
+        super().__init__(config, render_mode)
         self.observation_type_parking = None
 
     @classmethod
@@ -86,7 +89,7 @@ class ParkingEnv(AbstractEnv, GoalEnv):
             },
             "reward_weights": [1, 0.3, 0, 0, 0.02, 0.02],
             "success_goal_reward": 0.12,
-            "collision_reward": -5,
+            "collision_reward": -500,
             "steering_range": np.deg2rad(45),
             "simulation_frequency": 15,
             "policy_frequency": 5,
@@ -95,7 +98,9 @@ class ParkingEnv(AbstractEnv, GoalEnv):
             "screen_height": 300,
             "centering_position": [0.5, 0.5],
             "scaling": 7,
-            "controlled_vehicles": 1
+            "controlled_vehicles": 1,
+            "vehicles_count": 0,
+            "add_walls": True
         })
         return config
 
@@ -120,7 +125,7 @@ class ParkingEnv(AbstractEnv, GoalEnv):
         self._create_road()
         self._create_vehicles()
 
-    def _create_road(self, spots: int = 15) -> None:
+    def _create_road(self, spots: int = 14) -> None:
         """
         Create a road composed of straight adjacent lanes.
 
@@ -133,7 +138,7 @@ class ParkingEnv(AbstractEnv, GoalEnv):
         y_offset = 10
         length = 8
         for k in range(spots):
-            x = (k - spots // 2) * (width + x_offset) - width / 2
+            x = (k + 1 - spots // 2) * (width + x_offset) - width / 2
             net.add_lane("a", "b", StraightLane([x, y_offset], [x, y_offset+length], width=width, line_types=lt))
             net.add_lane("b", "c", StraightLane([x, -y_offset], [x, -y_offset-length], width=width, line_types=lt))
 
@@ -143,15 +148,41 @@ class ParkingEnv(AbstractEnv, GoalEnv):
 
     def _create_vehicles(self) -> None:
         """Create some new random vehicles of a given type, and add them on the road."""
+        # Controlled vehicles
         self.controlled_vehicles = []
         for i in range(self.config["controlled_vehicles"]):
-            vehicle = self.action_type.vehicle_class(self.road, [i*20, 0], 2*np.pi*self.np_random.rand(), 0)
+            vehicle = self.action_type.vehicle_class(self.road, [i*20, 0], 2*np.pi*self.np_random.uniform(), 0)
+            vehicle.color = VehicleGraphics.EGO_COLOR
             self.road.vehicles.append(vehicle)
             self.controlled_vehicles.append(vehicle)
 
+        # Goal
         lane = self.np_random.choice(self.road.network.lanes_list())
         self.goal = Landmark(self.road, lane.position(lane.length/2, 0), heading=lane.heading)
         self.road.objects.append(self.goal)
+
+        # Other vehicles
+        for i in range(self.config["vehicles_count"]):
+            lane = ("a", "b", i) if self.np_random.uniform() >= 0.5 else ("b", "c", i)
+            v = Vehicle.make_on_lane(self.road, lane, 4, speed=0)
+            self.road.vehicles.append(v)
+        for v in self.road.vehicles:  # Prevent early collisions
+            if v is not self.vehicle and (
+                    np.linalg.norm(v.position - self.goal.position) < 20 or
+                    np.linalg.norm(v.position - self.vehicle.position) < 20):
+                self.road.vehicles.remove(v)
+
+        # Walls
+        for y in [-21, 21]:
+            obstacle = Obstacle(self.road, [0, y])
+            obstacle.LENGTH, obstacle.WIDTH = (70, 1)
+            obstacle.diagonal = np.sqrt(obstacle.LENGTH**2 + obstacle.WIDTH**2)
+            self.road.objects.append(obstacle)
+        for x in [-35, 35]:
+            obstacle = Obstacle(self.road, [x, 0], heading=np.pi / 2)
+            obstacle.LENGTH, obstacle.WIDTH = (42, 1)
+            obstacle.diagonal = np.sqrt(obstacle.LENGTH**2 + obstacle.WIDTH**2)
+            self.road.objects.append(obstacle)
 
     def compute_reward(self, achieved_goal: np.ndarray, desired_goal: np.ndarray, info: dict, p: float = 0.5) -> float:
         """
@@ -170,21 +201,24 @@ class ParkingEnv(AbstractEnv, GoalEnv):
     def _reward(self, action: np.ndarray) -> float:
         obs = self.observation_type_parking.observe()
         obs = obs if isinstance(obs, tuple) else (obs,)
-        return sum(self.compute_reward(agent_obs['achieved_goal'], agent_obs['desired_goal'], {}) for agent_obs in obs)
+        reward = sum(self.compute_reward(agent_obs['achieved_goal'], agent_obs['desired_goal'], {}) for agent_obs in obs)
+        reward += self.config['collision_reward'] * sum(v.crashed for v in self.controlled_vehicles)
+        return reward
 
     def _is_success(self, achieved_goal: np.ndarray, desired_goal: np.ndarray) -> bool:
         return self.compute_reward(achieved_goal, desired_goal, {}) > -self.config["success_goal_reward"]
 
     def _is_terminated(self) -> bool:
-        """The episode is over if the ego vehicle crashed or the goal is reached."""
+        """The episode is over if the ego vehicle crashed or the goal is reached or time is over."""
         crashed = any(vehicle.crashed for vehicle in self.controlled_vehicles)
         obs = self.observation_type_parking.observe()
         obs = obs if isinstance(obs, tuple) else (obs,)
         success = all(self._is_success(agent_obs['achieved_goal'], agent_obs['desired_goal']) for agent_obs in obs)
-        return bool(crashed or success)
+        timeout = self.time >= self.config["duration"]
+        return bool(crashed or success or timeout)
 
     def _is_truncated(self) -> bool:
-        return self.time >= self.config["duration"]
+        return False
 
 
 class ParkingEnvActionRepeat(ParkingEnv):
@@ -192,12 +226,6 @@ class ParkingEnvActionRepeat(ParkingEnv):
         super().__init__({"policy_frequency": 1, "duration": 20})
 
 
-register(
-    id='parking-v0',
-    entry_point='highway_env.envs:ParkingEnv',
-)
-
-register(
-    id='parking-ActionRepeat-v0',
-    entry_point='highway_env.envs:ParkingEnvActionRepeat'
-)
+class ParkingEnvParkedVehicles(ParkingEnv):
+    def __init__(self):
+        super().__init__({"vehicles_count": 10})
