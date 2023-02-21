@@ -231,3 +231,5 @@ class ObservationGraphics(object):
                                    lidar_observation.origin[1] + r[i] * np.sin(psi[i])))
                   for i in range(np.size(psi))]
         pygame.draw.lines(surface, ObservationGraphics.COLOR, True, points, 1)
+
+

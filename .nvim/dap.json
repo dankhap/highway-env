@@ -1,0 +1,26 @@
+{
+	"configurations": [
+		{
+			"name": "test generalization",
+			"type": "python",
+			"request": "launch",
+			"python": "/home/daniel/miniconda3/envs/xrl/bin/python",
+			"stopOnEntry": false,
+			"debugOptions": [],
+			"program": "${workspaceFolder}/scripts/test_obstacle_sac.py",
+			"cwd": "${workspaceFolder}",
+			"justMyCode": false
+		},
+		{
+			"name": "test obstacle",
+			"type": "python",
+			"request": "launch",
+			"python": "/home/daniel/miniconda3/envs/xrl/bin/python",
+			"stopOnEntry": false,
+			"debugOptions": [],
+			"program": "${workspaceFolder}/scripts/test_obstacle_env.py",
+			"cwd": "${workspaceFolder}",
+			"justMyCode": false
+		}
+	]
+}

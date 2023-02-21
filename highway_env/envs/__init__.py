@@ -10,3 +10,4 @@ from highway_env.envs.u_turn_env import *
 from highway_env.envs.exit_env import *
 from highway_env.envs.racetrack_env import *
 from highway_env.envs.exit_continuous_env_4lane import *
+from highway_env.envs.obstacle_env import *
