@@ -68,6 +68,8 @@ class ObstacleEnv(AbstractEnv):
             "normalize_reward": True,
             "offroad_terminal": True,
             "real_time_rendering": False,
+            "simulation_frequency": 15,  # [Hz]
+            "policy_frequency": 10,  # [Hz]
             "obst_width_range": [2,4],
             "obst_length_range": [4,6],
             "obst_heading_range": [-np.pi*0.25, np.pi*0.25],
@@ -185,11 +187,11 @@ class ObstacleEnv(AbstractEnv):
         rnd_side = self.np_random.uniform(*self.config["obst_side_range"])
         rnd_friction = self.np_random.uniform(*self.config["obst_friction_range"])
         rnd_vlen = self.np_random.uniform(*self.config["obst_vlen_range"])
-        other_lane_lat = self.np_random.choice(range(self.config["lanes_count"]-1),1,p=0.5)
+            # route = self.np_random.choice(range(4), size=2, replace=False)
         ego_lane_idx = ("0", "1", 0)
         # ego_lane_idx = ("2", "3", 0)
         # self.other_lane_idx = ("2","3",1)
-        self.other_lane_idx = ("2","3",other_lane_lat)
+        begin_node, end_node, _ = self.other_lane_idx
 
         self.controlled_vehicles = []
         for others in other_per_controlled:
@@ -206,7 +208,9 @@ class ObstacleEnv(AbstractEnv):
             self.road.objects.append(obst)
             self._set_target(vehicle)
             for _ in range(others):
-                vehicle = self.create_random_reverse(lane_idx=self.other_lane_idx,  
+                other_lane_lat = self.np_random.choice(range(self.config["lanes_count"]-1), size=1)[0]
+                other_lane_idx = (begin_node, end_node, other_lane_lat)
+                vehicle = self.create_random_reverse(lane_idx=other_lane_idx,  
                                                      spacing=1 / self.config["vehicles_density"])
                 # vehicle.randomize_behavior()
                 self.road.vehicles.append(vehicle)
@@ -298,8 +302,8 @@ class ObstacleEnv(AbstractEnv):
             self.render()
         # self._clear_vehicles()
         # self._spawn_vehicle(spawn_probability=self.config["spawn_probability"])
-        # return obs, reward, terminated, truncated, info
-        return obs, reward, done, info
+        return obs, reward, terminated, trancated, info
+        # return obs, reward, done, info
 
     def _on_any_lane(self) -> bool:
         lane_idx = self.road.network.get_closest_lane_index(self.vehicle.position)

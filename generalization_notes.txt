@@ -1,0 +1,24 @@
+
+comparing two rl bottleneck methods, 
+metod1: bn4ge:  generalizing dynamics
+method2: IBAC-SNI
+
+one diffeerence is in how they menage the problem of
+stability at the begining of the training, where
+noise has a detrimental effect on agent's abillity to extract relevant 
+information, and produce longer trajectories.
+
+in bn4ge, the bottleneck loss part, is scaled (using \betta) and progressivly incremented. in the paper this process is called "Annealing Scheme".
+a significant part of the paper discusses choice of the \betta and the annealing schedule, with optimal bettas for different tasks
+the base rl algorithm used is PPO for control tasks and A2C for maze experiments
+
+in IBAC-SNI there is also the same bottleneck architecure but they dont use a finetuned beta schedule. instead, to preserve training stability at the early stages of training (and later), the sample the training trajectories using deterministic policies, and also during V evaluation they use the deterministic version. also when calculating gradients for the policy netowrk, they
+do a weighted average of the deterministic and bn noisy version.
+
+not sure which method is better, as using very low betta at the initial stage can be equivalent to using deterministic policies. It looks to me that the second version is more elegant, as it promised less parameters tuning.
+another Plus is that I found a good looking codebase on github. (https://github.com/microsoft/IBAC-SNI/tree/master/torch_rl).
+note: IBAC-SNI codebase doesnt support bn using a2c, only implemented for PPO (need to implement for SAC?, redo original experiments using PPO)
+not for the first method.
+
+current plan is to clone it and test on the same scenarios already tested for andromeda.
+

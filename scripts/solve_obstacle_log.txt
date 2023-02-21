@@ -18,3 +18,13 @@ ideas to make problem harder:
 1. add action noise
 1. more varied density, so agent HAS to wait behind obstacle
 1. when randomizing obstacle, try again if obstacle make the environemnt un-beatable
+
+
+need to make haeder problem
+current generalization results:
+original train env: 320.9846008562369, std:2.7692541230072423
+
+1.5x wider parameters distribution: 319.9770385573352, std:3.355194702992369
+2x wider parameters distribution: 320.669
+1.5x + third lane: 216.25
+2x + third lane:

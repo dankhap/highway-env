@@ -150,10 +150,16 @@ def extend_range(r, scale, min=0, max=9999):
     rc[rc>max] = max
     return rc
 
-def eval_policy(num_episodes, range_scale):
+
+# @cli.command("eval")
+# @click.option("--num_episodes", help="number of experiments")
+# @click.option("--range_scale", help="param dist range multiplier")
+# @click.option("--lane_count", help="num of lanes")
+def eval_policy(num_episodes, range_scale, lane_count):
     env = gym.make("obstacle-v0", render_mode='rgb_array')
     env.configure({
         "duration": 2048,  # [s]
+        "real_time_rendering": False,
         "vehicles_count": 20,
         "obs_yaw_rate": True,
         "obst_width_range": extend_range([2,4],range_scale),
@@ -164,7 +170,7 @@ def eval_policy(num_episodes, range_scale):
         "obst_friction_range": extend_range([14,16],range_scale*5), #15
         "obst_vlen_range": extend_range([0.9,1.1],  range_scale*5), #1
         "normalize_reward": False,
-        "lanes_count": 3
+        "lanes_count": lane_count
     })
     obs = env.reset()
     rewards = np.zeros(num_episodes)
@@ -189,9 +195,38 @@ def eval_policy(num_episodes, range_scale):
             env.render()
             if done:
               obs = env.reset()
-    print(f"avg total reward per episode: {np.mean(rewards)}")
+    m = np.mean(rewards)
+    s = np.std(rewards)
+    print(f"params: range: {range_scale}x, lane count: {lane_count}")
+    print(f"avg total reward per episode: {np.mean(rewards)}, std:{np.std(rewards)}")
+    return m,s
 
+def plot_results(avg, std):
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    # avg = [320.984,,,,]
+    # std = [2.769,,,]
+
+    exp = ('train', '1.5x2', '2x2', '1.5x3', '2x3')
+    y_pos = np.arange(len(exp))
+    value = tuple(avg)
+    Std = tuple(std)
+    colors=["gray", "red", "green", "blue", "purple"]
+    plt.bar(y_pos, value, yerr=Std, align='center', alpha=0.5, color=colors)
+    plt.xticks(y_pos, exp)
+    plt.ylabel('Average Reward')
+    plt.title('Generalization')
+    plt.show()
         
 if __name__ == "__main__":
     # cli()
-    eval_policy(num_episodes=5, range_scale=1.5)
+    # m1,s1 = eval_policy(num_episodes=200, range_scale=1, lane_count=2)
+    # m2,s2 = eval_policy(num_episodes=200, range_scale=1.5, lane_count=2)
+    # m3,s3 = eval_policy(num_episodes=200, range_scale=2, lane_count=2)
+    m4,s4 = eval_policy(num_episodes=200, range_scale=1.5, lane_count=3)
+    # m5,s5 = eval_policy(num_episodes=200, range_scale=2, lane_count=3)
+    # plot_results([m1,m2,m3,m4,m5], 
+    #              [s1,s2,s3,s4,s5])
+
