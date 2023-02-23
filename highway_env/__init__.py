@@ -33,6 +33,11 @@ def register_highway_envs():
     )
 
     register(
+        id='intersection-flatten-v0',
+        entry_point='highway_env.envs:MLPIntersectionEnv',
+    )
+
+    register(
         id='intersection-v1',
         entry_point='highway_env.envs:ContinuousIntersectionEnv',
     )

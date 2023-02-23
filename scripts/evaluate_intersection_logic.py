@@ -5,16 +5,10 @@ from highway_env.road.regulation import RegulatedRoad
 from highway_env.vehicle.behavior import IDMVehicle
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
-import pandas
 
 import gym
 import highway_env
 import numpy as np
-import torch
-import json
-from os import listdir
-from os.path import isfile, join
-import re
 
 import time
 env = gym.make("intersection-flatten-v0")
@@ -22,10 +16,10 @@ env = gym.make("intersection-flatten-v0")
 env.configure({
     # "manual_control": True,
     "real_time_rendering": False,
-    "spawn_probability": 1.0,
+    "spawn_probability": 1.0, #1.0,
     #"random_vehicles_density": True,
     "vehicles_density" : 5, #5,#1.6,
-    "duration": 24,
+    "duration": 15,
     "vehicles_count" : 15,
 
     "exclude_src_lane": 0,
@@ -51,7 +45,7 @@ episode_number = episode_number + 1
 #env.seed(5)
 
 #env.seed(episode_number)
-env.seed(0)
+# env.seed(0)
 observation = env.reset()
 done = False
 i=0
@@ -80,7 +74,8 @@ while ep_count < 50:
         #observation,reward,done,info = env.step(env.actio_space.sample())  # with manual control, these actions are ignored
         
         st = time.time()
-        observation,reward,done,info = env.step(next_action)  # with manual control, these actions are ignored
+        observation,reward,terminal,tranc,info = env.step(next_action)  # with manual control, these actions are ignored
+        done = terminal or tranc
         speeds.append(info["other_avg_speed"])
         collisions = max(info["other_crushed_count"] - crush_count, 0)
         if collisions > 0:

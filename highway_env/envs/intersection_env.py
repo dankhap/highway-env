@@ -110,11 +110,7 @@ class IntersectionEnv(AbstractEnv):
     def _is_terminated(self) -> bool:
         return any(vehicle.crashed for vehicle in self.controlled_vehicles) \
                or all(self.has_arrived(vehicle) for vehicle in self.controlled_vehicles) \
-               or (self.config["offroad_terminal"] and not self.vehicle.on_road)
-
-# improving behaivoir
-           #   or self.steps >= self.config["duration"] * self.config["policy_frequency"] \
-           #   or (self.config["anycrash_terminal"] and any([v.crashed for v in self.road.vehicles])) \
+               or (self.config["offroad_terminal"] and not self.vehicle.on_road) \
 
               
 
@@ -125,7 +121,8 @@ class IntersectionEnv(AbstractEnv):
                 self.time >= self.config["duration"])
 
     def _is_truncated(self) -> bool:
-        return
+               return self.steps >= self.config["duration"] * self.config["simulation_frequency"] \
+               or (self.config["anycrash_terminal"] and any([v.crashed for v in self.road.vehicles])) 
 
     def _info(self, obs: np.ndarray, action: int) -> dict:
         info = super()._info(obs, action)
