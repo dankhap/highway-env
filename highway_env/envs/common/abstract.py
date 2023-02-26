@@ -1,7 +1,7 @@
 import copy
 import os
 from typing import List, Tuple, Optional, Callable, TypeVar, Generic, Union, Dict, Text
-import gym
+import gymnasium as gym
 from gym import Wrapper
 from gym.wrappers import RecordVideo
 from gym.utils import seeding
