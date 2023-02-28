@@ -315,6 +315,30 @@ class MultiAgentIntersectionEnv(IntersectionEnv):
         })
         return config
 
+
+class SingleMultiAgentFlattenIntersectionEnv(IntersectionEnv):
+    @classmethod
+    def default_config(cls) -> dict:
+        config = super().default_config()
+        config.update({
+            "action": {
+                 "type": "MultiAgentAction",
+                 "action_config": {
+                     "type": "DiscreteMetaAction",
+                     "lateral": False,
+                     "longitudinal": True
+                 }
+            },
+            "observation": {
+                "type": "MultiAgentObservation",
+                "observation_config": {
+                    "type": "KinematicFlattenObservation"
+                }
+            },
+            "controlled_vehicles": 1
+        })
+        return config
+
 class ContinuousIntersectionEnv(IntersectionEnv):
     @classmethod
     def default_config(cls) -> dict:
