@@ -51,6 +51,7 @@ def register_highway_envs():
         id='intersection-multi-agent-flatten-v0',
         entry_point='highway_env.envs:SingleMultiAgentFlattenIntersectionEnv',
     )
+
     register(
         id='intersection-multi-agent-v1',
         entry_point='highway_env.envs:TupleMultiAgentIntersectionEnv',

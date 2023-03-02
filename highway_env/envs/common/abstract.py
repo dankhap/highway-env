@@ -74,10 +74,15 @@ class AbstractEnv(gym.Env):
         """First (default) controlled vehicle."""
         return self.controlled_vehicles[0] if self.controlled_vehicles else None
 
+    @property
+    def possible_agents(self) -> int:
+        return len(self.controlled_vehicles)
+
     @vehicle.setter
     def vehicle(self, vehicle: Vehicle) -> None:
         """Set a unique controlled vehicle."""
         self.controlled_vehicles = [vehicle]
+        
 
     @classmethod
     def default_config(cls) -> dict:

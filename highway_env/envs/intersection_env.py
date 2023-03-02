@@ -335,7 +335,7 @@ class SingleMultiAgentFlattenIntersectionEnv(IntersectionEnv):
                     "type": "KinematicFlattenObservation"
                 }
             },
-            "controlled_vehicles": 1
+            "controlled_vehicles": 2
         })
         return config
 
