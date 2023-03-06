@@ -229,7 +229,8 @@ class IntersectionEnv(AbstractEnv):
         self.controlled_vehicles = []
         for ego_id in range(0, self.config["controlled_vehicles"]):
             ego_lane = self.road.network.get_lane(("o{}".format(ego_id % 4), "ir{}".format(ego_id % 4), 0))
-            destination = self.config["destination"] or "o" + str(self.np_random.randint(1, 4))
+            # destination = self.config["destination"] or "o" + str(self.np_random.randint(1, 4))
+            destination = self.config["destination"] or "o" + str(np.random.randint(1, 4))
             ego_vehicle = self.action_type.vehicle_class(
                              self.road,
                              ego_lane.position(60 + 5*self.np_random.normal(1), 0),
@@ -335,7 +336,8 @@ class SingleMultiAgentFlattenIntersectionEnv(IntersectionEnv):
                     "type": "KinematicFlattenObservation"
                 }
             },
-            "controlled_vehicles": 2
+            "controlled_vehicles": 2,
+            "destination": None
         })
         return config
 
