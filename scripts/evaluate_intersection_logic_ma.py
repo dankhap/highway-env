@@ -11,7 +11,7 @@ import gymnasium as gym
 import numpy as np
 
 import time
-env = gym.make('intersection-flatten-v0')
+env = gym.make('intersection-multi-agent-flatten-v0')
 
 env.configure({
     # "manual_control": True,
@@ -66,7 +66,7 @@ while ep_count < 50:
     states_list.append(list(observation))
     info = {"is_success": False}
     total_time = 0
-    next_action = 0
+    next_action = (0,0)
     crush_count = 0
     while done == False:
         

@@ -1,7 +1,8 @@
 from collections import OrderedDict
 from itertools import product
 from typing import List, Dict, TYPE_CHECKING, Optional, Union, Tuple
-from gym import spaces
+import gymnasium as gym
+from gymnasium import spaces
 import numpy as np
 import pandas as pd
 

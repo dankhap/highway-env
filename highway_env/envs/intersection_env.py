@@ -110,11 +110,7 @@ class IntersectionEnv(AbstractEnv):
     def _is_terminated(self) -> bool:
         return any(vehicle.crashed for vehicle in self.controlled_vehicles) \
                or all(self.has_arrived(vehicle) for vehicle in self.controlled_vehicles) \
-               or (self.config["offroad_terminal"] and not self.vehicle.on_road)
-
-# improving behaivoir
-           #   or self.steps >= self.config["duration"] * self.config["policy_frequency"] \
-           #   or (self.config["anycrash_terminal"] and any([v.crashed for v in self.road.vehicles])) \
+               or (self.config["offroad_terminal"] and not self.vehicle.on_road) \
 
               
 
@@ -125,7 +121,8 @@ class IntersectionEnv(AbstractEnv):
                 self.time >= self.config["duration"])
 
     def _is_truncated(self) -> bool:
-        return
+               return self.steps >= self.config["duration"] * self.config["simulation_frequency"] \
+               or (self.config["anycrash_terminal"] and any([v.crashed for v in self.road.vehicles])) 
 
     def _info(self, obs: np.ndarray, action: int) -> dict:
         info = super()._info(obs, action)
@@ -232,7 +229,8 @@ class IntersectionEnv(AbstractEnv):
         self.controlled_vehicles = []
         for ego_id in range(0, self.config["controlled_vehicles"]):
             ego_lane = self.road.network.get_lane(("o{}".format(ego_id % 4), "ir{}".format(ego_id % 4), 0))
-            destination = self.config["destination"] or "o" + str(self.np_random.randint(1, 4))
+            # destination = self.config["destination"] or "o" + str(self.np_random.randint(1, 4))
+            destination = self.config["destination"] or "o" + str(np.random.randint(1, 4))
             ego_vehicle = self.action_type.vehicle_class(
                              self.road,
                              ego_lane.position(60 + 5*self.np_random.normal(1), 0),
@@ -315,6 +313,31 @@ class MultiAgentIntersectionEnv(IntersectionEnv):
                 }
             },
             "controlled_vehicles": 2
+        })
+        return config
+
+
+class SingleMultiAgentFlattenIntersectionEnv(IntersectionEnv):
+    @classmethod
+    def default_config(cls) -> dict:
+        config = super().default_config()
+        config.update({
+            "action": {
+                 "type": "MultiAgentAction",
+                 "action_config": {
+                     "type": "DiscreteMetaAction",
+                     "lateral": False,
+                     "longitudinal": True
+                 }
+            },
+            "observation": {
+                "type": "MultiAgentObservation",
+                "observation_config": {
+                    "type": "KinematicFlattenObservation"
+                }
+            },
+            "controlled_vehicles": 2,
+            "destination": None
         })
         return config
 

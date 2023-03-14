@@ -1,0 +1,28 @@
+total crash 12
+average speed 6.4 
+
+
+original, 1.0 spawn prob
+total crashes: 31 
+average vehicle speed: 6.396795037394132
+average time for episode 2.491018047332764
+13/50
+
+
+original, 0.6 spawn prob
+total crashes: 24
+average vehicle speed: 6.361555034163906
+average time for episode 2.2257837200164796
+10/50
+
+new, 0.6 spawn prob
+total crashes: 17
+average vehicle speed: 6.2747513256780225
+average time for episode 3.481168131828308
+8/50
+
+new, 1.0 spawn prob
+total crashes: 6-12
+average vehicle speed: 6.56240422913593
+average time for episode 4.298414635658264
+3-6/50
