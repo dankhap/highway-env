@@ -125,7 +125,8 @@ class IntersectionEnv(AbstractEnv):
                 self.time >= self.config["duration"])
 
     def _is_truncated(self) -> bool:
-        return
+       return self.steps >= self.config["duration"] * self.config["simulation_frequency"] \
+       or (self.config["anycrash_terminal"] and any([v.crashed for v in self.road.vehicles])) 
 
     def _info(self, obs: np.ndarray, action: int) -> dict:
         info = super()._info(obs, action)

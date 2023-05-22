@@ -1,3 +1,4 @@
+from clearml import Task
 import functools
 import gym
 import pygame
@@ -12,7 +13,7 @@ import numpy as np
 from torch.nn import functional as F
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 import os
 import highway_env
 import warnings
@@ -353,14 +354,19 @@ def compute_vehicles_attention(env, model):
 if __name__ == "__main__":
     train = True
     if train:
-        n_cpu = 4
+        Task.init(project_name="hw_intersection", task_name="sb3_ppo_transformer_single")
+
+        n_cpu = 16
         policy_kwargs = dict(
             features_extractor_class=CustomExtractor,
             features_extractor_kwargs=attention_network_kwargs,
         )
-        env = make_vec_env(make_configure_env, n_envs=n_cpu, seed=0, vec_env_cls=SubprocVecEnv, env_kwargs=env_kwargs)
+        # env = make_vec_env(make_configure_env, n_envs=n_cpu, seed=0, vec_env_cls=SubprocVecEnv, env_kwargs=env_kwargs)
+        env = make_vec_env(make_configure_env, n_envs=n_cpu, seed=0, vec_env_cls=DummyVecEnv, env_kwargs=env_kwargs)
         steps = 400000
         batch_size = 2048
+        # steps = 400
+        # batch_size = 64
         total_timesteps = 40000000
 ###
 
