@@ -30,3 +30,5 @@ _build
 obstacle_sac
 scripts/highway_attention_dqn
 scripts/highway_attention_ppo
+
+highway_attention_ppo
