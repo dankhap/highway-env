@@ -186,7 +186,7 @@ class AbstractEnv(gym.Env):
     def reset(self,
               *,
               seed: Optional[int] = None,
-              return_info: bool = False,
+              return_info: bool = True,
               options: Optional[dict] = None,
     ) -> Union[Observation, Tuple[Observation, dict]]:
         """

@@ -4,10 +4,14 @@ from clearml import Task
 import functools
 import numpy as np
 import gym
+from stable_baselines3.common.vec_env import DummyVecEnv
 import highway_env
 from highway_env.utils import lmap
 import pygame
 import seaborn as sns
+
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.callbacks import CheckpointCallback
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -65,9 +69,9 @@ def cli(algo, clearml):
 @click.option("--gymid", default="obstacle-v0", help="gym env id")
 @click.option("--lr", default=3e-4, help="Learning rate")
 @click.option("--ncpu", default=1, help="Number of cpu's")
-@click.option("--bs", default=4096, help="The person to greet.")
+@click.option("--bs", default=4096, help="Batch size")
 @click.option("--warmap", default=10000, help="warmup steps")
-@click.option("--hidden", default=254, help="warmup steps")
+@click.option("--hidden", default=254, help="hidden size")
 @click.option("--skipframe", default=0, help="how much frames to skip")
 @click.option("--ent_coef", default="auto", help="warmup steps")
 @click.option("--tsteps", default=4e6, help="total learninig steps")
@@ -90,6 +94,10 @@ def cli(algo, clearml):
         help="obstacle lateral distance range")
 @click.option("--frange", cls=PythonLiteralOption, default=[10, 20],
         help="vehicle friction range")
+@click.option("--lanes_count_option", cls=PythonLiteralOption, default=[2],
+        help="numner of lanes range")
+@click.option("--checkpoint", default="",
+        help="checkpoint path")
 def sac_run(gymid,
             lr,
             ncpu,
@@ -107,12 +115,13 @@ def sac_run(gymid,
             epi_stps,
             car_num,
             yaw_rate,
-            lrange, wrange, orange, srange, frange):
+            lrange, wrange, orange, srange, frange,
+            lanes_count_option,
+            checkpoint):
 
     exp_name = "obstacle_sac"
     env = gym.make(gymid, render_mode='rgb_array')
 
-    env = gym.make("obstacle-v0", render_mode='rgb_array')
     env.configure({
         "duration": epi_stps,  # [s]
         "vehicles_count": car_num,
@@ -120,15 +129,20 @@ def sac_run(gymid,
         "obst_width_range": wrange,
         "obst_length_range": lrange,
         "obst_heading_range": orange,
+        "policy_frequency": 2,
         # "obst_ego_dist_range": wrange,
         "obst_side_range": srange,
         "obst_friction_range": frange, #15
         "normalize_reward": norm_rew,
+        "lanes_count_option": lanes_count_option
     })
     obs = env.reset()
 
     env.render()
+
     env.viewer.set_agent_display(functools.partial(display_vehicles_attention, env=env ))
+
+    env = DummyVecEnv([lambda: gym.wrappers.RecordEpisodeStatistics(env)])
     model = SAC("MlpPolicy",
                 env,
                 batch_size=bs,
@@ -140,8 +154,15 @@ def sac_run(gymid,
                 verbose=2,
                 tensorboard_log=f"{exp_name}/")
 
-    model.learn(total_timesteps=tsteps, log_interval=4)
-    model.save(f"{exp_name}/model")
+    if checkpoint:
+        model.set_parameters(checkpoint)
+        print(f"loaded model from {checkpoint}")
+        print(f"model learning rate: {model.learning_rate}")
+
+    checkpoint_callback = CheckpointCallback(save_freq=write_every, save_path=f"{exp_name}/models")
+
+    model.learn(total_timesteps=tsteps, log_interval=4, callback=checkpoint_callback)
+    model.save(f"{exp_name}/final_model")
 
 def extend_range(r, scale, min=0, max=9999):
     rc = (r - np.mean(r)) * scale
@@ -159,7 +180,7 @@ def eval_policy(num_episodes, range_scale, lane_count):
     env = gym.make("obstacle-v0", render_mode='rgb_array')
     env.configure({
         "duration": 2048,  # [s]
-        "real_time_rendering": False,
+        "real_time_rendering": True,
         "vehicles_count": 20,
         "obs_yaw_rate": True,
         "obst_width_range": extend_range([2,4],range_scale),
@@ -170,8 +191,7 @@ def eval_policy(num_episodes, range_scale, lane_count):
         "obst_friction_range": extend_range([14,16],range_scale*5), #15
         "obst_vlen_range": extend_range([0.9,1.1],  range_scale*5), #1
         "normalize_reward": False,
-        "lanes_count": lane_count
-    })
+        "lanes_count_option": [lane_count, lane_count]})
     obs = env.reset()
     rewards = np.zeros(num_episodes)
 
@@ -182,19 +202,20 @@ def eval_policy(num_episodes, range_scale, lane_count):
                 learning_starts=6000,
                 tensorboard_log="test_highwat_sac/", verbose=1)
 
-    model = SAC.load("obstacle_sac/model")
+    # model = SAC.load("obstacle_sac/model")
+    model = SAC.load("obstacle_sac/models/rl_model_3000000_steps")
 
-    obs = env.reset()
+    obs, _ = env.reset()
 
     for i in range(num_episodes):
         done = False
         while not done:
             action, _ = model.predict(obs, deterministic=True)
-            obs, r, done, _ = env.step(action)
+            obs, r, done, _, _ = env.step(action)
             rewards[i] += r
             env.render()
             if done:
-              obs = env.reset()
+              obs, _ = env.reset()
     m = np.mean(rewards)
     s = np.std(rewards)
     print(f"params: range: {range_scale}x, lane count: {lane_count}")
@@ -209,24 +230,27 @@ def plot_results(avg, std):
     # avg = [320.984,,,,]
     # std = [2.769,,,]
 
-    exp = ('train', '1.5x2', '2x2', '1.5x3', '2x3')
+    exp = ('1.5x2', '2x2', '1.5x3', '2x3')
     y_pos = np.arange(len(exp))
     value = tuple(avg)
     Std = tuple(std)
-    colors=["gray", "red", "green", "blue", "purple"]
+    colors=["red", "green", "blue", "purple"]
     plt.bar(y_pos, value, yerr=Std, align='center', alpha=0.5, color=colors)
     plt.xticks(y_pos, exp)
     plt.ylabel('Average Reward')
     plt.title('Generalization')
-    plt.show()
+    plt.savefig('obstacle_sac2.png')
         
 if __name__ == "__main__":
     # cli()
-    # m1,s1 = eval_policy(num_episodes=200, range_scale=1, lane_count=2)
     # m2,s2 = eval_policy(num_episodes=200, range_scale=1.5, lane_count=2)
     # m3,s3 = eval_policy(num_episodes=200, range_scale=2, lane_count=2)
-    m4,s4 = eval_policy(num_episodes=200, range_scale=1.5, lane_count=3)
+    m4,s4 = eval_policy(num_episodes=200, range_scale=1, lane_count=3)
     # m5,s5 = eval_policy(num_episodes=200, range_scale=2, lane_count=3)
-    # plot_results([m1,m2,m3,m4,m5], 
-    #              [s1,s2,s3,s4,s5])
+    # print(m2,s2)
+    # print(m3,s3)
+    # print(m4,s4)
+    # print(m5,s5)
+    # plot_results([m2,m3,m4,m5], 
+    #              [s2,s3,s4,s5])
 

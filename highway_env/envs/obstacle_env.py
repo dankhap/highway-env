@@ -46,7 +46,7 @@ class ObstacleEnv(AbstractEnv):
                 "dynamical": True,
             },
             "obs_yaw_rate": True,
-            "lanes_count": 2,
+            "lanes_count_option": [2],
             "vehicles_count": 50,
             "exclude_src_lane": True,
             "controlled_vehicles": 1,
@@ -69,7 +69,7 @@ class ObstacleEnv(AbstractEnv):
             "offroad_terminal": True,
             "real_time_rendering": False,
             "simulation_frequency": 15,  # [Hz]
-            "policy_frequency": 10,  # [Hz]
+            "policy_frequency": 2,  # [Hz]
             "obst_width_range": [2,4],
             "obst_length_range": [4,6],
             "obst_heading_range": [-np.pi*0.25, np.pi*0.25],
@@ -81,12 +81,13 @@ class ObstacleEnv(AbstractEnv):
         return config
 
     def _reset(self) -> None:
+        self.lane_count = self.config["lanes_count_option"][0]
         self._create_road()
         self._create_vehicles()
 
     def _create_road(self) -> None:
         """Create a road composed of straight adjacent lanes."""
-        lane_count = self.config["lanes_count"]
+        lane_count = self.np_random.choice(self.config["lanes_count_option"],1)[0]
         # lane_count = 3
         opposit_lanes = lane_count - 1
         self.other_lane_idx = ("2","3",lane_count-2)
@@ -98,6 +99,7 @@ class ObstacleEnv(AbstractEnv):
                                                                    direction=[False]*opposit_lanes +[True],
                                                                    speed_limit=30),
                          np_random=self.np_random, record_history=self.config["show_trajectories"])
+        self.lane_count = lane_count
 
     def create_random_reverse(self, 
                       lane_idx: Tuple[str, str, int],
@@ -208,7 +210,7 @@ class ObstacleEnv(AbstractEnv):
             self.road.objects.append(obst)
             self._set_target(vehicle)
             for _ in range(others):
-                other_lane_lat = self.np_random.choice(range(self.config["lanes_count"]-1), size=1)[0]
+                other_lane_lat = self.np_random.choice(range(self.lane_count-1), size=1)[0]
                 other_lane_idx = (begin_node, end_node, other_lane_lat)
                 vehicle = self.create_random_reverse(lane_idx=other_lane_idx,  
                                                      spacing=1 / self.config["vehicles_density"])
